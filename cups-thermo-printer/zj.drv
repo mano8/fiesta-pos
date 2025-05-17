@@ -1,0 +1,43 @@
+// CUPS PPD Compiler CUPS v2.1.3
+// (Don't edit .ppd directly, edit this file instead, then use 
+//	ppdc zj-58.drv to generate zj58.ppd)
+// Include necessary files...
+#include <font.defs>
+#include <media.defs>
+
+// Posiflex PP-6800 (80 mm roll, 203 dpi, cutter + 2 cash drawers)
+{
+  Manufacturer       "Posiflex"
+  ModelName          "PP-6800"
+  PCFileName         "pp6800.ppd"
+  Version            "1.0"
+  DriverType         ps
+  ManualCopies       Yes
+  Throughput         1
+  Attribute "NickName"        "" "Posiflex PP-6800"
+  Attribute "ShortNickName"   "" "PP-6800"
+  Attribute "Product"         "" "(Posiflex PP-6800)"
+  Attribute "1284DeviceID"    "" "MFG:Posiflex;CMD:ESC/POS;MDL:PP-6800;CLS:PRINTER;"
+  Attribute "LanguageLevel"   "" "3"
+  Filter             "application/vnd.cups-raster 0 rastertozj"
+
+  Group "CutGroup/Cut Options"
+    Option "Cutting/Cutting" PickOne AnySetup 1
+      Choice "0NoCutting/No cutting" ""
+      *Choice "1CutAtTheEndOfPage/Cut at every page" ""
+      Choice "2CutAtTheEndOfJob/Cut at every job" ""
+
+  Group "CashDrawerGroup/Cash Drawer Control"
+    Option "CashDrawer1Setting/Cash Drawer 1" PickOne AnySetup 2
+      Choice "0NoCashDrawer1/No Cash Drawer 1" ""
+      Choice "1Drawer1BeforePrinting/Drawer 1 Before Printing" ""
+      *Choice "2Drawer1AfterPrinting/Drawer 1 After Printing" ""
+    Option "CashDrawer2Setting/Cash Drawer 2" PickOne AnySetup 2
+      Choice "0NoCashDrawer2/No Cash Drawer 2" ""
+      Choice "1Drawer2BeforePrinting/Drawer 2 Before Printing" ""
+      *Choice "2Drawer2AfterPrinting/Drawer 2 After Printing" ""
+
+  *CustomMedia "X80MMY210MM/80 mm x 210 mm" 227.00 595.00 0.00 0.00 0.00 0.00 \
+    "<</PageSize[227 595]/HWResolution[203 203]/ImagingBBox null>>setpagedevice" \
+    "<</PageSize[204 595]/HWResolution[203 203]/ImagingBBox null>>setpagedevice"
+}
