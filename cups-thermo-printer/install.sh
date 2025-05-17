@@ -11,7 +11,7 @@ ppdc *.drv
 
 echo "Copying files"
 cp rastertozj /usr/lib/cups/filter/
-mkdir -p /usr/share/cups/model/zjiang
+mkdir -p /usr/share/cups/model/posiflex
 cp ppd/pp6800.ppd /usr/share/cups/model/posiflex/
 cd /usr/lib/cups/filter
 chmod 755 rastertozj
