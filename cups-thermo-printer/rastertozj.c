@@ -1,398 +1,153 @@
-// To get required headers, run
-// sudo apt-get install libcups2-dev libcupsimage2-dev
+// rastertozj.c — ESC/POS filter with secure signal handling & error checks
+
 #include <cups/cups.h>
 #include <cups/ppd.h>
 #include <cups/raster.h>
 #include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
 #include <fcntl.h>
 #include <signal.h>
-
-// uncomment next line in order to have verbose dump in DEBUGFILE
-// after print
-
-//#define DEBUGP
+#include <unistd.h>
 
 #define DEBUGFILE "/tmp/debugraster.txt"
+struct settings_ {
+  int cashDrawer1, cashDrawer2, blankSpace, feedDist, cutting;
+} settings;
 
-struct settings_
-{
-	int cashDrawer1;
-	int cashDrawer2;
-	int blankSpace;
-	int feedDist;
-	int cutting;
-};
-struct settings_ settings;
-
-struct command
-{
-	int    length;
-	char* command;
-};
-
-// define printer initialize command
-static const struct command printerInitializeCommand =
-{2,(char[2]){0x1b,0x40}};
-
-// define cashDrawerEjector command
-static const struct command cashDrawerEject [2] =
-{{5,(char[5]){0x1b,0x70,0,0x40,0x50}},
- {5,(char[5]){0x1b,0x70,1,0x40,0x50}}};
-
-// define raster mode start command
-static const struct command rasterModeStartCommand =
-{4,(char[4]){0x1d,0x76,0x30,0}};
-
-// cut command <esc>+i
-static const struct command cutCommand = 
-{2,(char[2]){0x1b,0x69}};
+struct command { int length; const unsigned char *data; };
+static const unsigned char init_cmd[]       = {0x1B,0x40};
+static const unsigned char cut_cmd[]        = {0x1D,0x56,0x01};
+static const unsigned char raster_cmd[]     = {0x1D,0x76,0x30,0x00};
+static const unsigned char drawer1_cmd[]    = {0x1B,0x70,0x00,0x19,0xFA};
+static const unsigned char drawer2_cmd[]    = {0x1B,0x70,0x01,0x19,0xFA};
+static const struct command printerInit     = {2, init_cmd};
+static const struct command fullCut         = {3, cut_cmd};
+static const struct command rasterStart     = {4, raster_cmd};
+static const struct command drawerCmds[2]  = { {5, drawer1_cmd}, {5, drawer2_cmd} };
 
 #ifdef DEBUGP
-FILE* lfd = 0;
+static FILE *lfd = NULL;
 #endif
 
-// putchar with debug wrapper
-static inline void mputchar(char c)
-{
-	unsigned char m = c;
+// Secure signal handling
+static volatile sig_atomic_t cancel_flag = 0;
+static void handle_signal(int sig) { cancel_flag = 1; }
+static void setup_signals(void) {
+  struct sigaction sa; memset(&sa,0,sizeof(sa));
+  sa.sa_handler = handle_signal; sa.sa_flags = SA_RESTART;
+  sigemptyset(&sa.sa_mask);
+  sigaction(SIGTERM,&sa,NULL);
+  sigaction(SIGINT, &sa,NULL);
+  sigaction(SIGPIPE,&sa,NULL);
+}
+
+// Safe output
+static void safe_putchar(unsigned char c) {
+  if (putchar(c)==EOF) { perror("write"); exit(1); }
+}
+static void output_bytes(const unsigned char *d,int n){for(int i=0;i<n;i++)safe_putchar(d[i]);}
+
+// PPD option helper
+static int get_ppd_choice(const char *name, ppd_file_t *ppd) {
+  ppd_option_t *opt=ppdFindOption(ppd,name);
+  if(!opt) return 0;
+  ppd_choice_t *ch=ppdFindMarkedChoice(ppd,name);
+  if(!ch) ch=ppdFindChoice(opt,opt->defchoice);
+  return ch?atoi(ch->choice):0;
+}
+
+static void initializeSettings(const char *opts) {
+  const char *ppd_path = getenv("PPD");
+  if(!ppd_path||strncmp(ppd_path,"/etc/cups/ppd/",13)){fprintf(stderr,"Invalid PPD\n");exit(1);}
+  ppd_file_t *ppd=ppdOpenFile(ppd_path);
+  if(!ppd){perror("ppdOpen");exit(1);}
+  ppdMarkDefaults(ppd);
+  cups_option_t *a; int n=cupsParseOptions(opts,0,&a);
+  if(n>0){cupsMarkOptions(ppd,n,a);cupsFreeOptions(n,a);}
+  settings.cashDrawer1 = get_ppd_choice("CashDrawer1Setting",ppd);
+  settings.cashDrawer2 = get_ppd_choice("CashDrawer2Setting",ppd);
+  settings.blankSpace  = get_ppd_choice("BlankSpace",ppd);
+  settings.feedDist    = get_ppd_choice("FeedDist",ppd);
+  settings.cutting     = get_ppd_choice("Cutting",ppd);
+  ppdClose(ppd);
+}
+
+static void jobSetup(void) {
+  if(settings.cashDrawer1==1) output_bytes(drawerCmds[0].data,5);
+  if(settings.cashDrawer2==1) output_bytes(drawerCmds[1].data,5);
+  output_bytes(printerInit.data,2);
+}
+
+static void pageEnd(void) {
+  for(int i=0;i<settings.feedDist;i++){safe_putchar(0x1B);safe_putchar(0x4A);safe_putchar(24);}
+  if(settings.cutting==1) output_bytes(fullCut.data,3);
+}
+
+static void jobShutdown(void) {
+  if(settings.cutting==2) output_bytes(fullCut.data,3);
+  if(settings.cashDrawer1==2) output_bytes(drawerCmds[0].data,5);
+  if(settings.cashDrawer2==2) output_bytes(drawerCmds[1].data,5);
+  output_bytes(printerInit.data,2);
+}
+
+int main(int argc,char *argv[]) {
+  if(argc<6||argc>7){fprintf(stderr,"Usage: rastertozj job user title copies opts [file]\n");return 1;}
+  setup_signals();
+  initializeSettings(argv[5]);
+
+  int fd=0;
+  if(argc==7 && strcmp(argv[6],"-")!=0){
+    if(strncmp(argv[6],"/var/spool/cups/",16)){fprintf(stderr,"Bad file %s\n",argv[6]);return 1;}
+    fd=open(argv[6],O_RDONLY); if(fd<0){perror("open");return 1;}
+  }
+
 #ifdef DEBUGP
-	if (lfd)
-		fprintf (lfd,"%02x ",m);
+  lfd=fopen(DEBUGFILE,"w");
 #endif
-	if (putchar(m) == EOF) {
-        perror("ERROR: Write to stdout failed");
-        exit(EXIT_FAILURE);
+
+  jobSetup();
+  cups_raster_t *ras=cupsRasterOpen(fd,CUPS_RASTER_READ);
+  if(!ras){perror("cupsRasterOpen");return 1;}
+
+  cups_page_header2_t hdr;
+  unsigned char *stripe=NULL;
+  size_t stripe_size=0;
+  int page=0;
+
+  while(!cancel_flag && cupsRasterReadHeader2(ras,&hdr)) {
+    if(hdr.cupsHeight<=0||hdr.cupsBytesPerLine<=0) break;
+    if(!stripe) {
+      size_t sz=hdr.cupsBytesPerLine*24;
+      if(hdr.cupsBytesPerLine>65536/24||sz>65536){fprintf(stderr,"Stripe too big\n");break;}
+      stripe=malloc(sz); if(!stripe){perror("malloc");break;} stripe_size=sz;
     }
-}
-
-// procedure to output an array
-static inline void outputarray(const char * array, int length)
-{
-	int i = 0;
-	for (;i<length;++i)
-		mputchar(array[i]);
-}
-
-// output a command
-static inline void outputCommand(struct command output)
-{
-	outputarray(output.command,output.length);
-}
-
-static inline int lo(int val)
-{
-	return val & 0xFF;
-}
-
-static inline int hi (int val)
-{
-	return lo (val>>8);
-}
-
-// enter raster mode and set up x and y dimensions
-static inline void rasterheader(int xsize, int ysize)
-{
-	outputCommand(rasterModeStartCommand);
-	mputchar(lo(xsize));
-	mputchar(hi(xsize));
-	mputchar(lo(ysize));
-	mputchar(hi(ysize));
-}
-
-// print all unprinted (i.e. flush the buffer)
-// then feed given number of lines
-static inline void skiplines(int size)
-{
-	mputchar(0x1b);
-	mputchar(0x4a);
-	mputchar(size);
-}
-
-// get an option
-static inline int getOptionChoiceIndex(const char * choiceName, ppd_file_t * ppd)
-{
-	ppd_choice_t * choice;
-	ppd_option_t * option;
-
-	choice = ppdFindMarkedChoice(ppd, choiceName);
-
-	if (choice == NULL)
-	{
-		if ((option = ppdFindOption(ppd, choiceName))          == NULL) return -1;
-		if ((choice = ppdFindChoice(option,option->defchoice)) == NULL) return -1;
-	}
-
-	return atoi(choice->choice);
-}
-
-
-void initializeSettings(char * commandLineOptionSettings)
-{
-	ppd_file_t *    ppd         = NULL;
-	cups_option_t * options     = NULL;
-	int             numOptions  = 0;
-    
-	const char *ppd_path = getenv("PPD");
-    if (!ppd_path || strncmp(ppd_path, "/etc/cups/ppd/", 13) != 0) {
-        fputs("ERROR: Invalid PPD path\n", stderr);
-        return EXIT_FAILURE;
+    page++;
+    for(int y=0;y<hdr.cupsHeight && !cancel_flag;){
+      int chunk=(hdr.cupsHeight-y>24?24:hdr.cupsHeight-y);
+      size_t bytes=((size_t)chunk*hdr.cupsBytesPerLine+7)&~7;
+      if(bytes>stripe_size){fprintf(stderr,"Overflow\n");break;}
+      unsigned char *p=stripe;
+      int i;
+      for(i=0;i<chunk && cupsRasterReadPixels(ras,p,hdr.cupsBytesPerLine);i++) p+=bytes;
+      y+=i;
+      size_t j; for(j=0;j<bytes && stripe[j]==0;j++);
+      if(j<bytes){
+        output_bytes(rasterStart.data,4);
+        safe_putchar((unsigned char)(hdr.cupsWidth&0xFF));
+        safe_putchar((unsigned char)(hdr.cupsWidth>>8));
+        safe_putchar((unsigned char)(chunk&0xFF));
+        safe_putchar((unsigned char)(chunk>>8));
+        fwrite(stripe,1,i*bytes,stdout);
+        safe_putchar(0x1B); safe_putchar(0x4A); safe_putchar(0);
+      }
     }
-	ppd = ppdOpenFile(ppd_path);
+    pageEnd();
+  }
 
-    if (!ppd) {
-        perror("ERROR: Cannot open PPD");
-        return EXIT_FAILURE;
-    }
-
-	ppdMarkDefaults(ppd);
-
-	numOptions = cupsParseOptions(commandLineOptionSettings, 0, &options);
-	if ((numOptions != 0) && (options != NULL))
-	{
-		cupsMarkOptions(ppd, numOptions, options);
-		cupsFreeOptions(numOptions, options);
-	}
-
-	memset(&settings, 0x00, sizeof(struct settings_));
-
-	settings.cashDrawer1  = getOptionChoiceIndex("CashDrawer1Setting", ppd);
-	settings.cashDrawer2  = getOptionChoiceIndex("CashDrawer2Setting", ppd);
-	settings.blankSpace   = getOptionChoiceIndex("BlankSpace"        , ppd);
-	settings.feedDist     = getOptionChoiceIndex("FeedDist"          , ppd);
-	settings.cutting      = getOptionChoiceIndex("Cutting"           , ppd);
-
-	ppdClose(ppd);
+  jobShutdown();
+  if(stripe) free(stripe);
+  cupsRasterClose(ras);
+  if(fd) close(fd);
+  return (page>0 && !cancel_flag)?0:1;
 }
-
-// sent on the beginning of print job
-void jobSetup()
-{
-	if ( settings.cashDrawer1==1 )
-		outputCommand(cashDrawerEject[0]);
-	if ( settings.cashDrawer2==1 )
-		outputCommand(cashDrawerEject[1]);
-	outputCommand(printerInitializeCommand);
-}
-
-// sent at the very end of print job
-void ShutDown()
-{
-	// Cut on end of a job
-	if (settings.cutting == 2) {
-		outputCommand(cutCommand);
-	}
-
-	if ( settings.cashDrawer1==2 )
-		outputCommand(cashDrawerEject[0]);
-	if ( settings.cashDrawer2==2 )
-		outputCommand(cashDrawerEject[1]);
-	outputCommand(printerInitializeCommand);
-}
-
-// sent at the end of every page
-#ifndef __sighandler_t
-typedef void (*__sighandler_t) (int);
-#endif
-
-__sighandler_t old_signal;
-void EndPage()
-{
-	int i;
-	for (i=0; i<settings.feedDist; ++i)
-		skiplines(0x18);
-	signal(15,old_signal);
-
-	// Cut on every page
-	if (settings.cutting == 1) {
-		outputCommand(cutCommand);
-	}
-}
-
-// sent on job canceling
-void cancelJob(int foo)
-{
-	int i=0;
-	for(;i<0x258;++i)
-		mputchar(0);
-	EndPage();
-	ShutDown();
-}
-
-// invoked before starting to print a page
-void pageSetup()
-{
-	old_signal = signal(15,cancelJob);
-}
-
-//////////////////////////////////////////////
-//////////////////////////////////////////////
-int main(int argc, char *argv[])
-{
-	int fd = 0;					// File descriptor providing CUPS raster data
-	cups_raster_t * ras = NULL; // Raster stream for printing
-	cups_page_header2_t header; // CUPS Page header
-	int page = 0;				// Current page
-	int y = 0;					// Vertical position in page 0 <= y <= header.cupsHeight
-
-	unsigned char * rasterData   = NULL;	// Pointer to raster data from CUPS
-	unsigned char * originalRasterDataPtr   = NULL; // Copy of original pointer for freeing buffer
-
-	if (argc < 6 || argc > 7)
-	{
-		fputs("ERROR: rastertozj job-id user title copies options [file]\n", stderr);
-		return EXIT_FAILURE;
-	}
-
-	if (argc == 7 && strcmp(argv[6], "-") != 0)
-	{
-        if (strncmp(argv[6], "/var/spool/cups/", 16) != 0) {
-            fprintf(stderr, "ERROR: Invalid input file path\n");
-            sleep(1);
-			return EXIT_FAILURE;
-        }
-		if ((fd = open(argv[6], O_RDONLY)) == -1)
-		{
-			perror("ERROR: Unable to open raster file - ");
-			sleep(1);
-			return EXIT_FAILURE;
-		}
-	} else
-		fd = 0;
-
-#ifdef DEBUGP
-	lfd = fopen ("/tmp/raster.txt","w");
-#endif
-
-	initializeSettings(argv[5]);
-	jobSetup();
-	ras = cupsRasterOpen(fd, CUPS_RASTER_READ);
-	page = 0;
-
-	while (cupsRasterReadHeader2(ras, &header))
-	{
-		if ((header.cupsHeight == 0) || (header.cupsBytesPerLine == 0))
-			break;
-
-#ifdef DEBUGP
-	if (lfd) fprintf(lfd,"\nheader.cupsHeight=%d, header.cupsBytesPerLine=%d\n",header.cupsHeight,header.cupsBytesPerLine);
-#endif
-
-		if (rasterData == NULL)
-		{
-            size_t stripe_size = header.cupsBytesPerLine*24;
-            if (header.cupsBytesPerLine == 0 || stripe_size / 24 != header.cupsBytesPerLine || stripe_size > 65536) {
-                fputs("ERROR: Invalid stripe size\n", stderr);
-                return EXIT_FAILURE;
-            }
-			rasterData = malloc(stripe_size);
-			if (rasterData == NULL)
-			{
-				if (originalRasterDataPtr   != NULL) free(originalRasterDataPtr);
-					cupsRasterClose(ras);
-				if (fd != 0)
-			        close(fd);
-				return EXIT_FAILURE;
-
-			}
-			originalRasterDataPtr = rasterData;  // used to later free the memory
-		}
-
-		fprintf(stderr, "PAGE: %d %d\n", ++page, header.NumCopies);
-		pageSetup();
-
-		int foo = ( header.cupsWidth > 0x180 ) ? 0x180 : header.cupsWidth;
-		foo = (foo+7) & 0xFFFFFFF8;
-		int width_size = foo >> 3;
-
-#ifdef DEBUGP
-	if (lfd) fprintf(lfd,"\nheader.cupsWidth=%d, foo=%d, width_size=%d\n",header.cupsWidth,foo,width_size);
-#endif
-		y = 0;
-		int zeroy = 0;
-
-		while ( y < header.cupsHeight )
-		{
-            if ((y & 127) != 0)
-				fprintf(stderr, "INFO: Printing page %d, %d%% complete...\n", page, (100 * y / header.cupsHeight));
-
-			int rest = header.cupsHeight-y;
-			if (rest>24)
-				rest=24;
-
-#ifdef DEBUGP
-	if (lfd) fprintf(lfd,"\nProcessing block of %d, starting from %d lines\n",rest,y);
-#endif
-			y+=rest;
-
-			if (y)
-			{
-				unsigned char * buf = rasterData;
-				int j;
-				for ( j=0; j<rest; ++j)
-				{
-					if (!cupsRasterReadPixels(ras,buf,header.cupsBytesPerLine))
-						break;
-					buf+=width_size;
-				}
-#ifdef DEBUGP
-	if (lfd) fprintf(lfd,"\nReaded %d lines\n",j);
-#endif
-				if (j<rest)
-					continue;
-			}
-            size_t rest_bytes = (size_t)rest * width_size;
-            if (rest_bytes > stripe_size) {
-                fputs("ERROR: Computed rest_bytes out of bounds\n", stderr);
-                return EXIT_FAILURE;
-            }
-			int j;
-			for (j=0; j<rest_bytes;++j)
-				if (rasterData[j]!=0)
-					break;
-
-#ifdef DEBUGP
-	if (lfd) fprintf(lfd,"\nChecked %d bytes of %d for zero\n",j,rest_bytes);
-#endif
-
-			if (j>=rest_bytes)
-			{
-				++zeroy;
-				continue;
-			}
-
-			for (;zeroy>0;--zeroy)
-				skiplines(24);
-			
-			rasterheader(width_size,rest);
-			outputarray((char*)rasterData,width_size*24);
-			skiplines(0);
-		}
-		
-		if (!settings.blankSpace)
-			for(;zeroy>0;--zeroy)
-				skiplines(24);
-
-		EndPage();
-	}
-
-	ShutDown();
-
-	if (originalRasterDataPtr   != NULL) free(originalRasterDataPtr);
-	cupsRasterClose(ras);
-	if (fd != 0)
-		close(fd);
-
-	if (page == 0)
-		fputs("ERROR: No pages found!\n", stderr);
-	else
-		fputs("INFO: Ready to print.\n", stderr);
-
-#ifdef DEBUGP
-	if (lfd)
-		fclose(lfd);
-#endif
-
-	return (page == 0)?EXIT_FAILURE:EXIT_SUCCESS;
-}
-
-// end of rastertozj.c
