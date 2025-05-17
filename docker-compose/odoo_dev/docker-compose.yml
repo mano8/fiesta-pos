@@ -1,0 +1,35 @@
+services:
+  fiesta_db:
+    image: postgres:13.21-alpine3.20
+    restart: always
+    # set shared memory limit when using docker compose
+    shm_size: 128mb
+    ports:
+      - "8069:8069"
+    volumes:
+      - ./postgres/pgdata:/var/lib/postgresql/data/pgdata
+    environment:
+      POSTGRES_DB: ${DB_DATABASE}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    networks:
+      - local_network
+  fiesta_odoo:
+    image: odoo:18.0
+    restart: always
+    volumes:
+      - ./odoo/data:/var/lib/odoo
+      - ./odoo/config:/etc/odoo
+      - ./odoo/addons:/mnt/extra-addons
+    ports:
+      - "8070:8069"
+    links:
+      - "fiesta_db:db"
+    depends_on:
+      - fiesta_db
+    networks:
+      - local_network
+networks:
+  local_network:
+    driver: bridge
