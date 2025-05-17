@@ -3,7 +3,6 @@
 
 # Odoo volumes
 odoo/addons/*
-odoo/config/*
 odoo/data/*
 
 # Postgres SQL volumes
