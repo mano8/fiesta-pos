@@ -1,0 +1,10 @@
+*.env*
+*README_DEV*.md
+
+# Odoo volumes
+odoo/addons/*
+odoo/config/*
+odoo/data/*
+
+# Postgres SQL volumes
+postgres/pgdata/*
