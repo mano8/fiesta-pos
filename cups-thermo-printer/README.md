@@ -36,6 +36,16 @@ sudo chmod a+x ./install
 sudo ./install
 ```
 
+- **Warning**  
+
+> CUPS 1.6+ has deprecated the old PPD API (ppdOpenFile, ppdFindOption, ppdFindChoice, ppdMarkDefaults, ppdClose).
+> You will see those warnings on compile driver
+> ToDo: update `rastertozj.c` with new Api.  
+
+- **Warning**:  
+
+> Printer drivers are deprecated and will stop working in a future version of CUPS.
+
 ### (Re)create CUPS queue for PP6800
 
 Go on installing printer with CUPS at [http://localhost:631/](http://localhost:631/) or:
@@ -51,7 +61,7 @@ sudo cupsaccept PP6800
 
 ## Writing own PPD
 
----------------
+------------
 
 You may write own PPD file for your printer to use any media size you want. Just open
 zj.drv file with any text editor and copy-paste printer section embraced with curly brackets.
