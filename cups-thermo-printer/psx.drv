@@ -37,7 +37,6 @@
       Choice "1Drawer2BeforePrinting/Drawer 2 Before Printing" ""
       *Choice "2Drawer2AfterPrinting/Drawer 2 After Printing" ""
 
-  *CustomMedia "X80MMY210MM/80 mm x 210 mm" 227 595 0 0 0 0 \
-    "<</PageSize[227 595]/HWResolution[203 203]/ImagingBBox null>>setpagedevice" \
-    "<</PageSize[204 595]/HWResolution[203 203]/ImagingBBox null>>setpagedevice"
+  *CustomMedia "X80MMY210MM/80 mm x 210 mm" 227 595 0 0 0 0 "<</PageSize[227 595]/HWResolution[203 203]/ImagingBBox null>>setpagedevice" "<</PageSize[204 595]/HWResolution[203 203]/ImagingBBox null>>setpagedevice"
+
 }
