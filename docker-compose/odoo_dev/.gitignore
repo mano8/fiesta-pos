@@ -2,8 +2,9 @@
 *README_DEV*.md
 
 # Odoo volumes
-odoo/addons/*
-odoo/data/*
+*odoo/addons/*
+*odoo/data/*
+*odoo/config/*
 
 # Postgres SQL volumes
-postgres/pgdata/*
+*postgres/pgdata/*

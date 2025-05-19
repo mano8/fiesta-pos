@@ -1,9 +1,16 @@
 *.env*
+*__pycache__/*
+
+# Dev Readme
 *README_DEV*.md
 
 # Odoo volumes
-odoo/addons/*
-odoo/data/*
+*odoo/addons/*
+*odoo/data/*
+*odoo/config/*
 
 # Postgres SQL volumes
-postgres/pgdata/*
+*postgres/pgdata/*
+
+# certs
+*.pem
