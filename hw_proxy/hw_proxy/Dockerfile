@@ -46,7 +46,7 @@ RUN dos2unix /opt/hw_proxy/scripts/docker_start.sh
 # Ensure scripts have execution permission
 RUN chmod +x /opt/hw_proxy/scripts/docker_start.sh
 
-RUN echo | ls -alt /opt/hw_proxy/scripts/
+RUN echo | ls -alt /opt/hw_proxy/scripts/ > tmp.txt
 
 # Set the PYTHONPATH to ensure the hw_proxy module is found
 ENV PYTHONPATH=/opt/hw_proxy
