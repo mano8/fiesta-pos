@@ -46,6 +46,8 @@ RUN dos2unix /opt/hw_proxy/scripts/docker_start.sh
 # Ensure scripts have execution permission
 RUN chmod +x /opt/hw_proxy/scripts/docker_start.sh
 
+RUN ls -alt /opt/hw_proxy/scripts/
+
 # Set the PYTHONPATH to ensure the hw_proxy module is found
 ENV PYTHONPATH=/opt/hw_proxy
 
@@ -53,4 +55,4 @@ ENV PYTHONPATH=/opt/hw_proxy
 EXPOSE 8015
 
 # Use the entrypoint script as CMD, which will run migrations and then launch uvicorn
-CMD ["./hw_proxy/scripts/docker_start.sh"]
+CMD ["/opt/hw_proxy/scripts/docker_start.sh"]
