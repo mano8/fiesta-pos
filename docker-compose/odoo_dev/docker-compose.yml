@@ -20,8 +20,6 @@ services:
     restart: always
     # set shared memory limit when using docker compose
     shm_size: 128mb
-    ports:
-      - "8069:8069"
     volumes:
       - ./postgres/pgdata:/var/lib/postgresql/data/pgdata
     environment:
@@ -46,11 +44,11 @@ services:
       PRINTER_KEY: "PP6800"
     volumes:
       - ../../hw_proxy/hw_proxy:/opt/hw_proxy
-      - ./hw_proxy.env:/opt/auth_user_service/.env:ro
+      - ./hw_proxy.env:/opt/hw_proxy_service/.env:ro
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.auth-router.entrypoints=api,websecure"
-      - "traefik.http.services.auth-router.loadbalancer.server.port=8015"
+      - "traefik.http.routers.hw-proxy.entrypoints=api,websecure"
+      - "traefik.http.services.hw-proxy.loadbalancer.server.port=8015"
     networks:
       - odoo_network
 
@@ -63,6 +61,10 @@ services:
       - ./odoo/addons:/mnt/extra-addons
     links:
       - "fiesta_db:db"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.odoo.entrypoints=api,websecure"
+      - "traefik.http.services.odoo.loadbalancer.server.port=8069"
     depends_on:
       - fiesta_db
     networks:
