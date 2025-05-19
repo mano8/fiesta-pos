@@ -1,0 +1,17 @@
+[Unit]
+Description=Odoo POS Docker Compose Stack
+Requires=serial-config.service
+After=network-online.target serial-config.service
+Wants=network-online.target
+
+[Service]
+Type=notify
+WorkingDirectory=/opt/fiesta-pos/docker-compose/odoo_dev
+ExecStart=/usr/local/bin/docker-compose up
+ExecStop=/usr/local/bin/docker-compose down
+Restart=on-failure
+TimeoutStartSec=600
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
