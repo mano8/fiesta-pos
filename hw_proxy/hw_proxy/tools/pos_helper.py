@@ -8,7 +8,7 @@ from io import BytesIO
 from PIL import Image
 from hw_proxy.device_helper import DeviceHelper
 from hw_proxy.core.exceptions import HwDeviceError, HwPrinterError
-from hw_proxy.schemas import DeviceConfigSchemas, NetworkDeviceSchemas, PrinteImageConfSchemas, SerialDeviceSchemas, UsbDeviceSchemas
+from hw_proxy.hw_proxy.core.schemas import DeviceConfigSchemas, NetworkDeviceSchemas, PrinteImageConfSchemas, SerialDeviceSchemas, UsbDeviceSchemas
 from hw_proxy.supported_devices import DevicePortType, DeviceType, device_list
 
 class EscPosHelper(DeviceHelper):
