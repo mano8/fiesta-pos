@@ -11,7 +11,7 @@ RUN groupadd --gid 1000 appuser && \
     useradd --uid 1000 --gid appuser --create-home appuser
 
 # Set working directory
-WORKDIR /opt
+WORKDIR /opt/hw_proxy
 
 # Install build dependencies if needed (e.g., for any compiled packages)
 RUN apt-get update && apt-get install -y --no-install-recommends \
