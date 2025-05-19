@@ -2,8 +2,8 @@
 Device helper for hw_proxy module
 """
 from typing import Optional
-from hw_proxy.hw_proxy.core.schemas import DeviceConfigSchemas, PrinteImageConfSchemas
-from hw_proxy.supported_devices import device_list
+from hw_proxy.core.schemas import DeviceConfigSchemas, PrinteImageConfSchemas
+from hw_proxy.core.supported_devices import device_list
 
 
 class DeviceHelper:

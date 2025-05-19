@@ -6,7 +6,7 @@ Pydantic schemas for hw_proxy module
 from typing import Literal, Optional, Union
 from pydantic import BaseModel
 
-from hw_proxy.supported_devices import DevicePortType, DeviceType
+from hw_proxy.core.supported_devices import DevicePortType, DeviceType
 
 
 class UsbDeviceSchemas(BaseModel):

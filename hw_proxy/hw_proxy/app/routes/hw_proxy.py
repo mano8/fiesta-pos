@@ -6,8 +6,8 @@ import base64
 from fastapi import APIRouter, HTTPException, Header, Request
 from fastapi.responses import JSONResponse
 from escpos.printer import Dummy
-from hw_proxy.pos_helper import EscPosHelper
-from hw_proxy.hw_proxy.core.schemas import PrintRequest
+from hw_proxy.tools.pos_helper import EscPosHelper
+from hw_proxy.core.schemas import PrintRequest
 
 
 router = APIRouter(prefix="/hw_proxy", tags=["hw_proxy"])
