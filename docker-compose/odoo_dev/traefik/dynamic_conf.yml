@@ -12,7 +12,7 @@ http:
     odoo-router:
       entryPoints:
         - api
-      rule: "PathPrefix(`/`)"
+      rule: "PathPrefix(`/odoo`)"
       service: odoo-service
     #  tls: {}
 
