@@ -13,12 +13,14 @@ services:
       - ./traefik/dynamic_conf.yml:/etc/traefik/dynamic_conf.yml:ro
       - ./traefik/certs:/etc/traefik/certs:ro
       - ./traefik/acme.json:/etc/traefik/acme.json
+    logging:
+      driver: "journald"
+    restart: unless-stopped
     networks:
       - odoo_network
 
   fiesta_db:
     image: postgres:13.21-alpine3.20
-    restart: always
     # set shared memory limit when using docker compose
     shm_size: 128mb
     volumes:
@@ -28,6 +30,9 @@ services:
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       PGDATA: /var/lib/postgresql/data/pgdata
+    logging:
+      driver: "journald"
+    restart: unless-stopped
     networks:
       - odoo_network
 
@@ -43,6 +48,10 @@ services:
       SET_DOCS: true
       SET_REDOC: true
       PRINTER_KEY: "PP6800"
+    devices:
+      - /dev/ttyACM0:/dev/ttyACM0
+    group_add:
+      - dialout
     volumes:
       - ../../hw_proxy/hw_proxy:/opt/hw_proxy
       - ./hw_proxy.env:/opt/hw_proxy_service/.env:ro
@@ -50,12 +59,14 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.hw-proxy.entrypoints=hw"
       - "traefik.http.services.hw-proxy.loadbalancer.server.port=8015"
+    logging:
+      driver: "journald"
+    restart: unless-stopped
     networks:
       - odoo_network
 
   fiesta_odoo:
     image: odoo:18.0
-    restart: always
     volumes:
       - ./odoo/data:/var/lib/odoo
       - ./odoo/config:/etc/odoo
@@ -66,8 +77,11 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.odoo.entrypoints=api,websecure"
       - "traefik.http.services.odoo.loadbalancer.server.port=8069"
+    logging:
+      driver: "journald"
     depends_on:
       - fiesta_db
+    restart: unless-stopped
     networks:
       - odoo_network
 
