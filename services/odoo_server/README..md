@@ -17,6 +17,7 @@ sudo cp services/odoo_server/serial-config.service /etc/systemd/system/serial-co
 
 ```bash
 sudo systemctl enable serial-config.service
+sudo systemctl daemon-reload
 sudo systemctl start serial-config.service
 ```
 
@@ -24,9 +25,17 @@ sudo systemctl start serial-config.service
 
 ```bash
 sudo systemctl status serial-config.service
+sudo journalctl -xeu serial-config.service
 ```
 
 ## 2. Auto run docker compose containers
+
+To do so need to use `oneshot` systemd service type.
+And all containers must have:
+
+```yml
+    restart: unless-stopped
+```
 
 - Add service to `systemd`
 
@@ -39,6 +48,7 @@ sudo cp services/odoo_server/odoo-pos.service /etc/systemd/system/odoo-pos.servi
 
 ```bash
 sudo systemctl enable odoo-pos.service
+sudo systemctl daemon-reload
 sudo systemctl start odoo-pos.service
 ```
 
@@ -46,31 +56,111 @@ sudo systemctl start odoo-pos.service
 
 ```bash
 sudo systemctl status odoo-pos.service
+sudo journalctl -xeu odoo-pos.service
 ```
 
 ## 3. Containers logs
 
-### Docker-Level Log Rotation
+### Docker-Level Logs
 
-### Host-Side Log Rotation with logrotate
+- Add this to all container who needs logs.
 
-- create `/etc/logrotate.d/docker-containers`
+```yml
+    logging:
+      driver: "journald"
+```
+
+- to check docker logs driver
 
 ```bash
-sudo nano /etc/logrotate.d/docker-containers
+sudo docker inspect -f '{{ .HostConfig.LogConfig.Type }}' odoo_dev-fiesta_odoo-1
+```
+
+#### View logs
+
+- first need to identify container names
+
+```bash
+sudo docker ps --format '{{.Names}}'
+```
+
+- Get somthing as 
+
+```text
+odoo_dev-fiesta_odoo-1
+odoo_dev-traefik-1
+odoo_dev-fiesta_db-1
+odoo_dev-hw_proxy_service-1
+```
+
+- to view logs from systemd
+
+```bash
+sudo journalctl -f CONTAINER_NAME=odoo_dev-fiesta_odoo-1
+```
+
+- to view complete message logs from systemd
+
+```bash
+sudo journalctl -f CONTAINER_NAME=odoo_dev-fiesta_odoo-1 -all
+```
+
+- to view logs directly in docker
+
+```bash
+sudo docker logs -f odoo_dev-fiesta_odoo-1
+```
+
+
+### Configure journald 
+
+- create `/etc/systemd/journald.conf.d/00-docker.conf`
+
+```bash
+sudo nano /etc/systemd/journald.conf.d/00-docker.conf
 ```
 
 - And add above content
 
-```text
-/var/lib/docker/containers/*/*.log {
-  rotate 7
-  daily
-  compress
-  missingok
-  copytruncate
-  size 100M
-  dateext
-  notifempty
-}
+```ini
+[Journal]
+# Limit total disk space taken by all journal files
+SystemMaxUse=1G
+# Always leave at least this much free space on the filesystem
+SystemKeepFree=100M
+
+# Cap individual journal files to 100 MiB each
+SystemMaxFileSize=100M
+# Keep at most 10 archived journal files
+SystemMaxFiles=10
+
+# Runtime (volatile) journals in /run/log/journal
+RuntimeMaxUse=200M
+RuntimeKeepFree=50M
+RuntimeMaxFileSize=50M
+RuntimeMaxFiles=5
+
+# Optionally expire entries older than 2 weeks
+MaxRetentionSec=2week
+
+# Compress archived journal files
+Compress=yes
+```
+
+  - `SystemMaxUse=` controls aggregate size for persistent logs (typically in `/var/log/journal`)
+  - `SystemMaxFileSize=` sets how big each file grows before rotating
+  - `SystemMaxFiles=` limits number of archived files
+  - The `Runtime*` settings apply to volatile logs in `/run/log/journal`
+  - `MaxRetentionSec=` and `MaxFileSec=` (not shown) can govern time-based retention.
+
+- After ediiting reload with
+
+```bash
+sudo systemctl restart systemd-journald
+```
+
+- Can see full config with
+
+```bash
+sudo systemd-analyze cat-config systemd/journald.conf
 ```
