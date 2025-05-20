@@ -1,11 +1,12 @@
 services:
   traefik:
-    image: traefik:v3.4.0-rc2
+    image: traefik:v3.4.0
     ports:
       - "8000:80"
       - "4430:443"
       - "8080:8080"   # Dashboard
-      - "9000:9000"   # services entryPoint
+      - "9000:9000"   # odoo entryPoint
+      - "9001:9001"   # hw_proxy entryPoint
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
@@ -47,7 +48,7 @@ services:
       - ./hw_proxy.env:/opt/hw_proxy_service/.env:ro
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.hw-proxy.entrypoints=api,websecure"
+      - "traefik.http.routers.hw-proxy.entrypoints=hw"
       - "traefik.http.services.hw-proxy.loadbalancer.server.port=8015"
     networks:
       - odoo_network
