@@ -12,15 +12,15 @@ http:
     odoo-router:
       entryPoints:
         - api
-      rule: "PathPrefix(`/odoo`)"
+      rule: "PathPrefix(`/`)"
       service: odoo-service
     #  tls: {}
 
     # HwProxy Service router
     hw-proxy-router:
       entryPoints:
-        - api
-      rule: "PathPrefix(`/hw-proxy`)"
+        - hw
+      rule: "PathPrefix(`/hw_proxy`)"
       service: hw-proxy-service
     #  tls: {}
 
