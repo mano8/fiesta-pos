@@ -30,7 +30,15 @@ sudo journalctl -xeu serial-config.service
 
 ## 2. Auto run docker compose containers
 
-To do so need to use `oneshot` systemd service type.
+**Warnin**  
+This service only run containers, you must pre build with
+
+```bash
+sudo docker compose build
+```
+
+**Important**  
+Need to use `oneshot` systemd service type.
 And all containers must have:
 
 ```yml
