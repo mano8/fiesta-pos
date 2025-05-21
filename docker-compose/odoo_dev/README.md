@@ -1,17 +1,34 @@
 # Odoo Docker compose
 
-## Set up .env file
+## Requirements
 
-Copy .env.example.txt to `.env`
+### Pos printer configuration for `hw_proxy_service`
+
+By default Oddo need IotBox or compatible Epson printer to work.
+Here FastApi `hw_proxy_service` App work as proxy service between Odoo and Pos Printer. This app needs access to serial port and correct serial configuration to work.
+
+> See How to Setup `udev` rules
+> See how to configure serial port
+
+### Set up .env file
+
+- Copy .env.example.txt to `.env`
 
 ```bash
 cp ./env.example.txt ./.env
+# Update env values
 nano .env
 ```
 
-Next you should set needed all values in `.env` file.
+- Copy hw_proxy.env.example.txt to `hw_proxy.env`
 
-## Set up Oddo config file
+```bash
+cp ./hw_proxy.env.example.txt ./hw_proxy.env
+# Update hw_proxy env values
+nano hw_proxy.env
+```
+
+### Set up Oddo config file
 
 Add same data as `.env` file for db connection.
 
@@ -19,7 +36,9 @@ Add same data as `.env` file for db connection.
 nano ./odoo/config/odoo.conf
 ```
 
-## On linux: Set Correct owners for docker volumes
+### On Unix: Set Correct owners for docker volumes
+
+> See [Understanding the Docker USER Instruction](https://www.docker.com/blog/understanding-the-docker-user-instruction/)
 
 You must set volume files owner accordingelly with container user id.
 
@@ -27,8 +46,24 @@ You must set volume files owner accordingelly with container user id.
 
 ```bash
 sudo docker run --rm odoo:18.0 id odoo
-# Usually outputs: uid=100(odoo) gid=101(odoo) groups=101(odoo)
+# Usually outputs:
+> uid=100(odoo) gid=101(odoo) groups=101(odoo)
 ```
+
+> See [Debian UID and GID classes](https://www.debian.org/doc/debian-policy/ch-opersys.html#uid-and-gid-classes)
+
+- Control system host uid and gid
+
+We need to ensure docker container UID and GID not colapse with system host UID and GID.
+
+```bash
+id -un -- 100
+> dhcpcd
+getent group 101
+> messagebus:x:101:
+```
+
+In this system 
 
 - Change volumes directory owners
 
@@ -66,3 +101,8 @@ Now we can run containers, normally with Odoo db initialyzed.
 ```bash
 sudo docker compose up --build --remove-orphans
 ```
+
+## Systemd services
+
+> See [Oddo Server Service]() to enable.
+
