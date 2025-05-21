@@ -47,45 +47,61 @@ id dockremap
 
 ## Set up mTls for docker demon sock
 
-- Move to docker certs folder
-
 ```bash
-cd /opt/fiesta-pos/docker/certs
+export DOCKER_HOST_IP=10.254.254.1
 ```
 
-- Generate CA private key
+### Generate Certificates
+
+- Generate all needed certificates for docker deamon API
 
 ```bash
-openssl genrsa -out ca-key.pem 4096
-
-openssl req -x509 -new -nodes -key ca-key.pem -sha256 -days 3650 -out ca.pem -subj "/C=ES/ST=Andalusia/L=Almería/O=Docker_Certs/CN=ca.local"
+sudo DOCKER_HOST_IP="$DOCKER_HOST_IP" /opt/fiesta-pos/docker/scripts/manage_docker_certs.sh generate
 ```
 
-- Generate server certificates
+- To remove all those certificates
 
 ```bash
-openssl genrsa -out server-key.pem 2048
-
-openssl req -new -key server-key.pem -out server.csr -config openssl.conf
-
-openssl x509 -req -in server.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial -out server-cert.pem -days 3650 -extensions req_ext -extfile openssl.conf
+sudo /opt/fiesta-pos/docker/scripts/manage_docker_certs.sh remove
 ```
 
-- Generate client certificates
+### Setup dummy interface for docker deamon api
+
+#### With Network manager
+
+- Ensure `NetworkManager` is active
 
 ```bash
-openssl genrsa -out client-key.pem 2048
-
-openssl req -new -key client-key.pem -out client.csr -subj "/C=ES/ST=Andalusia/L=Almería/O=Traefik/CN=traefik-client"
-
-openssl x509 -req -in client.csr -CA ca.pem -CAkey ca-key.pem -CAcreateserial -out client-cert.pem -days 3650
+systemctl is-enabled NetworkManager
+> enabled
+systemctl is-active  NetworkManager
+> active
 ```
 
-- Configure Docker deamon  (`/etc/docker/daemon.json`)
+- Set Dummy interface with `nmcli`
+
+```bash
+sudo nmcli connection add  type dummy ifname docker0-mgmt con-name docker0-mgmt ip4 "$DOCKER_HOST_IP"/32 autoconnect yes
+```
+
+- Active interface
+
+```bash
+sudo nmcli connection up docker0-mgmt
+```
+
+- Control
+
+```bash
+ip addr show docker0-mgmt
+nmcli device status | grep docker0-mgmt
+```
+
+### Configure Docker deamon  (`/etc/docker/daemon.json`)
 
 ```json
 {
-  "hosts": ["unix:///var/run/docker.sock", "tcp://127.0.0.1:2376"],
+  "hosts": ["unix:///var/run/docker.sock", "tcp://10.254.254.1:2376"],
   "tls": true,
   "tlsverify": true,
   "tlscacert": "/etc/docker/certs/ca.pem",
@@ -126,11 +142,11 @@ sudo docker info | grep -E 'Storage Driver|Userns|Experimental'
 sudo systemctl status docker
 
 sudo ss -tlnp | grep dockerd
-> LISTEN 0      4096       127.0.0.1:2376       0.0.0.0:*    users:(("dockerd",pid=16757,fd=4))
+> LISTEN 0      4096       10.254.254.1:2376       0.0.0.0:*    users:(("dockerd",pid=16757,fd=4))
 
 # check tls
 # from directory /opt/fiesta-pos/docker/certs
-sudo docker --tlsverify --tlscacert=ca.pem --tlscert=client-cert.pem --tlskey=client-key.pem -H tcp://127.0.0.1:2376 version
+sudo docker --tlsverify --tlscacert=/opt/fiesta-pos/docker/certs/ca.pem --tlscert=/opt/fiesta-pos/docker/certs/client-cert.pem --tlskey=/opt/fiesta-pos/docker/certs/client-key.pem -H tcp://10.254.254.1:2376 version
 ```
 
 ### Debug
