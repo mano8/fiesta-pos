@@ -139,8 +139,16 @@ ls -l /dev/elo-ser
 In screen apears calibration targets to tap for calibrating.
 Repeat operation to ensure at most 3 calibration points are set.
 
+> From SSH
+
 ```bash
 DISPLAY=:0 sudo ./elovaLite --nvram
+```
+
+> From Host Machine
+
+```bash
+sudo ./elovaLite --nvram
 ```
 
 ## Extra Tips
