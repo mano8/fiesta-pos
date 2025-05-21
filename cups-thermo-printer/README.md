@@ -1,5 +1,10 @@
 # Posiflex PP6800 cups filter
 
+>**Warning**  
+> Use of printer drivers is deprecated in cups.
+> We really don't need to use this to wor with PosPrinters in Odoo.
+> See Docker Compose variants
+
 This package is fork of [futurelink](https://github.com/futurelink/cups-thermo-printer) `cups-thermo-printer` package.
 
 ## Installation
