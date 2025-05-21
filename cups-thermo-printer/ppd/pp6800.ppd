@@ -1,0 +1,68 @@
+*PPD-Adobe: "4.3"
+*%%%% PPD file for PP-6800 with CUPS.
+*%%%% Created by the CUPS PPD Compiler CUPS v2.4.7.
+*FormatVersion: "4.3"
+*FileVersion: "1.0"
+*LanguageVersion: English
+*LanguageEncoding: ISOLatin1
+*PCFileName: "pp6800.ppd"
+*Product: "(Posiflex PP-6800)"
+*Manufacturer: "Posiflex"
+*ModelName: "Posiflex PP-6800"
+*ShortNickName: "PP-6800"
+*NickName: "Posiflex PP-6800"
+*PSVersion: "(3010.000) 0"
+*LanguageLevel: "3"
+*ColorDevice: False
+*DefaultColorSpace: Gray
+*FileSystem: False
+*Throughput: "1"
+*LandscapeOrientation: Plus90
+*% Driver-defined attributes...
+*1284DeviceID: "MFG:Posiflex;CMD:ESC/POS;MDL:PP-6800;CLS:PRINTER;"
+*cupsVersion: 2.4
+*cupsModelNumber: 0
+*cupsManualCopies: True
+*cupsFilter: "application/vnd.cups-raster 0 rastertozj"
+*cupsLanguages: "en"
+*OpenUI *PageSize/Media Size: PickOne
+*OrderDependency: 10 AnySetup *PageSize
+*DefaultPageSize: X80MMY210MM
+*PageSize X80MMY210MM/80 mm x 210 mm: "<</PageSize[227 595]/HWResolution[203 203]/ImagingBBox null>>setpagedevice"
+*CloseUI: *PageSize
+*OpenUI *PageRegion/Media Size: PickOne
+*OrderDependency: 10 AnySetup *PageRegion
+*DefaultPageRegion: X80MMY210MM
+*PageRegion X80MMY210MM/80 mm x 210 mm: "<</PageSize[204 595]/HWResolution[203 203]/ImagingBBox null>>setpagedevice"
+*CloseUI: *PageRegion
+*DefaultImageableArea: X80MMY210MM
+*ImageableArea X80MMY210MM/80 mm x 210 mm: "0 0 227 595"
+*DefaultPaperDimension: X80MMY210MM
+*PaperDimension X80MMY210MM/80 mm x 210 mm: "227 595"
+*OpenGroup: CutGroup/Cut Options
+*OpenUI *Cutting/Cutting: PickOne
+*OrderDependency: 1 AnySetup *Cutting
+*DefaultCutting: 1CutAtTheEndOfPage
+*Cutting 0NoCutting/No cutting: ""
+*Cutting 1CutAtTheEndOfPage/Cut at every page: ""
+*Cutting 2CutAtTheEndOfJob/Cut at every job: ""
+*CloseUI: *Cutting
+*CloseGroup: CutGroup
+*OpenGroup: CashDrawerGroup/Cash Drawer Control
+*OpenUI *CashDrawer1Setting/Cash Drawer 1: PickOne
+*OrderDependency: 2 AnySetup *CashDrawer1Setting
+*DefaultCashDrawer1Setting: 2Drawer1AfterPrinting
+*CashDrawer1Setting 0NoCashDrawer1/No Cash Drawer 1: ""
+*CashDrawer1Setting 1Drawer1BeforePrinting/Drawer 1 Before Printing: ""
+*CashDrawer1Setting 2Drawer1AfterPrinting/Drawer 1 After Printing: ""
+*CloseUI: *CashDrawer1Setting
+*OpenUI *CashDrawer2Setting/Cash Drawer 2: PickOne
+*OrderDependency: 2 AnySetup *CashDrawer2Setting
+*DefaultCashDrawer2Setting: 2Drawer2AfterPrinting
+*CashDrawer2Setting 0NoCashDrawer2/No Cash Drawer 2: ""
+*CashDrawer2Setting 1Drawer2BeforePrinting/Drawer 2 Before Printing: ""
+*CashDrawer2Setting 2Drawer2AfterPrinting/Drawer 2 After Printing: ""
+*CloseUI: *CashDrawer2Setting
+*CloseGroup: CashDrawerGroup
+*DefaultFont: Courier
+*% End of pp6800.ppd, 02654 bytes.
