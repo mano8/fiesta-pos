@@ -1,15 +1,6 @@
-import os
-import base64
-import asyncio
-from io import BytesIO
-import time
-from PIL import Image
-from fastapi import FastAPI, Header, HTTPException, Depends, Request
+"""FastAPI Async IoT Box Proxy for Odoo (Printer)"""
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel
-from escpos.printer import Usb, Network, Serial, Dummy
-
 from hw_proxy.app.main import app_router
 
 # --- App Initialization ---
