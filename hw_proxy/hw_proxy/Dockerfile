@@ -10,8 +10,17 @@ ENV PYTHONUNBUFFERED=1 \
 RUN groupadd --gid 1000 appuser && \
     useradd --uid 1000 --gid appuser --create-home appuser
 
+# Add the user to the dialout group
+RUN usermod -aG dialout appuser
+
 # Set working directory
 WORKDIR /opt
+
+# Create the app directories and set permissions
+RUN mkdir -p hw_proxy
+# Copy the hw_proxy source code
+COPY --chown=appuser:appuser ./hw_proxy ./hw_proxy
+RUN chown -R appuser:appuser ./hw_proxy
 
 # Install build dependencies if needed (e.g., for any compiled packages)
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -21,10 +30,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     pkg-config \
     && rm -rf /var/lib/apt/lists/*
-
-# Create the app directories and set permissions
-RUN mkdir -p ./hw_proxy \
-    && chown -R appuser:appuser ./hw_proxy
 
 # Copy requirements and install them as the non-root user
 COPY --chown=appuser:appuser ./hw_proxy/requirements-docker-dev.txt .
@@ -38,8 +43,6 @@ USER appuser
 RUN pip install --no-cache-dir --user --upgrade pip && \
     pip install --no-cache-dir --user -r requirements-docker-dev.txt
 
-# Copy the hw_proxy source code
-COPY --chown=appuser:appuser ./hw_proxy ./hw_proxy
 
 RUN dos2unix /opt/hw_proxy/scripts/docker_start.sh
 
