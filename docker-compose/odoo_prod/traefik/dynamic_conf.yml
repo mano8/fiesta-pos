@@ -13,12 +13,6 @@ tls:
     default:
       minVersion: VersionTLS12
 
-  domains:
-    - main: "traefik-client.local"
-      sans:
-        - "localhost"
-        - "127.0.0.1"
-        - "192.168.1.146"
 http:
 
   # 1) Dashboard router — only on websecure, only from localhost
