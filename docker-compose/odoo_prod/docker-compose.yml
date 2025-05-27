@@ -50,6 +50,7 @@ services:
       SET_DOCS: true
       SET_REDOC: true
       PRINTER_KEY: "PP6800"
+    userns_mode: "host"
     devices:
       - /dev/ttyACM0:/dev/ttyACM0
     group_add:
