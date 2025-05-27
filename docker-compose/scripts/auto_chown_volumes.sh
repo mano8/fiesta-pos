@@ -19,11 +19,13 @@ BASE_GID=231072
 declare -A SERVICES_MAP=(
   [fiesta_odoo]="fiesta_odoo"
   [fiesta_db]="fiesta_db"
+  [traefik]="traefik"
 )
 
 declare -A SERVICE_UID_MAP=(
   [fiesta_odoo]=100
   [fiesta_db]=0
+  [traefik]=0
 )
 
 declare -A ODOO_VOLUMES_MAP=(
@@ -34,6 +36,10 @@ declare -A ODOO_VOLUMES_MAP=(
 
 declare -A DB_VOLUMES_MAP=(
   [pgdata]="$PROJECT_ROOT/postgres/pgdata"
+)
+
+declare -A TRAEFIK_VOLUMES_MAP=(
+  [certs]="$PROJECT_ROOT/traefik/certs"
 )
 
 # --- Helpers ---
@@ -83,6 +89,8 @@ for service in "${!SERVICES_MAP[@]}"; do
     volumes=("${ODOO_VOLUMES_MAP[@]}")
   elif [[ "$service" == "fiesta_db" ]]; then
     volumes=("${DB_VOLUMES_MAP[@]}")
+  elif [[ "$service" == "traefik" ]]; then
+    volumes=("${TRAEFIK_VOLUMES_MAP[@]}")
   else
     info "  * No volume mapping for $service — skipping"
     continue
