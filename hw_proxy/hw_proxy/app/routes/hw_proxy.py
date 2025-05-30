@@ -15,7 +15,7 @@ logging.basicConfig()
 configure_logging(debug=True)
 logger = logging.getLogger("hw_proxy")
 
-router = APIRouter(prefix="/hw_proxy", tags=["hw_proxy"])
+router = APIRouter()
 
 IOT_BOX_SECRET = None
 PRINTER_KEY = "PP6800"
@@ -43,12 +43,13 @@ async def verify_secret(
 @router.get("/hello")
 async def hello():
     """Emulates IoT Box hello endpoint"""
-    return {"result": "hello", "version": "1.0"}
+    return "ping"
 
 
 @router.post("/handshake")
 async def handshake(body: dict):
     """Emula el handshake JSON-RPC del IoT Box"""
+    # return True
     req_id = body.get("id")
     return {
         "jsonrpc": "2.0",
@@ -66,6 +67,7 @@ async def handshake(body: dict):
 
 @router.post("/customer_facing_display")
 async def customer_facing_display(req: Request):
+    
     body = await req.json()
     req_id = body.get("id")
     params = body.get("params", {})
@@ -76,124 +78,137 @@ async def customer_facing_display(req: Request):
 
 @router.post("/status_json")
 async def status_json(req: Request):
-    body = await req.json()
-    req_id = body.get("id")
-
-    def _query_status():
-        try:
-            pos = EscPosHelper(PRINTER_KEY)
-            printer = pos.get_printer()
-            is_online = printer.is_online()
-            paper_status_code = printer.paper_status()
-            paper_status_map = {
-                2: "ok",
-                1: "near_end",
-                0: "no_paper"
-            }
-            paper_status = paper_status_map.get(paper_status_code, "unknown")
-            return {
-                "is_online": is_online,
-                "paper_status": paper_status
-            }
-        except Exception as e:
-            return {
-                "is_online": False,
-                "paper_status": "unknown",
-                "error": str(e)
-            }
-    status = await asyncio.to_thread(_query_status)
-    return JSONResponse({"jsonrpc": "2.0", "id": req_id, "params": status})
-
+    """
+    Get Hardware status.
+    Only accept printer and cashdrawer.
+    Exact expected output is not clear.
+    """
+    try:
+        logger.debug("[status_json] Get printer status")
+        pos = EscPosHelper(PRINTER_KEY)
+        status = pos.get_printer_status() #await asyncio.to_thread(pos.get_printer_status())
+        current_status = pos.get_str_printer_status(
+            printer_status=status
+        )
+        logger.debug(
+            f"[status_json] status: {current_status}"
+        )
+        return JSONResponse({
+            "jsonrpc": "2.0",
+            # in case of global status is required
+            "status": current_status,
+            "scanner": {  # Possible: no utilities to work
+                "status": "disconnected"
+            },
+            "printer": {  # Possible
+                "status": current_status
+            },
+            "cashbox": {  # Unknown: Depends on printer
+                "status": current_status
+            },
+            "cashdrawer": {  # Unknown: Depends on printer
+                "status": current_status
+            },
+            "scale": {  # Possible: no utilities to work
+                "status": "disconnected"
+            },
+            "customer_facing_display": {  # Possible: no utilities to work
+                "status": "disconnected"
+            },
+            "customer_display": {  # Possible: no utilities to work
+                "status": "disconnected"
+            },
+            "display": {  # Possible: no utilities to work
+                "status": "disconnected"
+            },
+            "printer_detail": status
+        })
+    except Exception as e:
+        logger.error(f"Error in status_json: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal Server Error: {e}"
+        ) from e
 
 @router.post("/default_printer_action")
 async def default_printer_action(req: Request):
-    """Handle generic default_printer_action calls from Odoo POS"""
+    """
+    Handle generic default_printer_action calls from Odoo POS
+    see odoo  /web/static/src/core/network/rpc.js 
+    For response format.
+    """
     logger.debug("Start Default printer Action...")
-    body = await req.json()
-    req_id = body.get("id")
-    params = body.get("params", {})
-    data = params.get("data", {})
-    action = data.get("action")
-    receipt = data.get("receipt")
+    action = None
     try:
-        def _job():
-            pos = EscPosHelper(PRINTER_KEY)
-            printer = pos.get_printer()
-            # Choose action
-            if action == "print_receipt":
-                if receipt is not None:
-                    logger.debug("Convert to Image...")
-                    img = pos.format_base64_to_image(receipt)
-                    d = Dummy()
-                    # debug_save_image(img)
-                    # eimg = EscposImage(img_source=f"/tmp/ticket.png")
-                    # raster = eimg.to_raster_format()
-                    d.image(img, impl="bitImageColumn")
-                    d.cut(feed=True)
-                    printer._raw(d.output)
-                    logger.debug("Ticket imprimido...")
-            elif action == "cut":
-                printer._raw(CMD_CUT)
-            # Odoo may use 'cashbox'
-            elif action in ("cashbox", "cashdrawer"):
-                printer._raw(CMD_CASHDRAWER)
-            else:
-                # unknown action, ignore or log
-                logger.warning(
-                    "[WARNING] Unknown default_printer_action: "
-                    f"{action}"
-                )
-            printer.close()
-    except Exception as e:
-        logger.error(
-            f"Fatal Error: Unable to run printer action : {action}"
-        )
-        logger.debug(
-            f"exception : {e}"
-        )
-        return HTTPException(
-            status_code=400,
-            detail=f"Fatal Error: Unable to run printer action : {action}"
-        )
-    # asyncio.create_task(asyncio.to_thread(_job))
-    logger.debug("Start job...")
-    _job()
-    return {"jsonrpc": "2.0", "id": req_id, "result": {"success": True}}
-
-
-@router.post("/print")
-async def print_ticket(req: PrintRequest):
-    """Print a ticket with optional cut and cashdrawer."""
-    try:
-        data_bytes = base64.b64decode(req.data)
-    except Exception as e:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid base64 data: {e}"
-        )
-
-    async def _job():
+        body = await req.json()
+        req_id = body.get("id")
+        params = body.get("params", {})
+        data = params.get("data", {})
+        action = data.get("action")
+        receipt = data.get("receipt")
         pos = EscPosHelper(PRINTER_KEY)
-        printer = pos.get_printer()
-        await asyncio.to_thread(printer._raw, data_bytes)
-        if req.cut:
-            await asyncio.to_thread(printer._raw, CMD_CUT)
-        if req.cashdrawer:
-            await asyncio.to_thread(printer._raw, CMD_CASHDRAWER)
+        # asyncio.create_task(asyncio.to_thread(_job))
+        result = pos.default_printer_action(
+            action=action,
+            receipt=receipt
+        )
+        if result:
+            # Successful response
+            return JSONResponse(
+                content={
+                    "jsonrpc": "2.0",
+                    "id": req_id,
+                    "result": {"success": True}
+                }
+            )
+        else:
+            # Error response
+            return JSONResponse(
+                content={
+                    "jsonrpc": "2.0",
+                    "id": req_id,
+                    "error": {
+                        "code": -1,
+                        "message": "Unable to run printer action",
+                        "data": {"action": action}
+                    }
+                }
+            )
 
-    asyncio.create_task(_job())
-    return {"success": True}
+    except Exception as e:
+        logger.error(f"Fatal Error: Unable to run printer action: {action}")
+        logger.debug(f"Exception: {e}")
+
+        # Error response for exceptions
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "jsonrpc": "2.0",
+                "id": body.get("id"),
+                "error": {
+                    "code": -1,
+                    "message": f"Fatal Error: Unable to run printer action: {action}",
+                    "data": {"action": action}
+                }
+            }
+        )
 
 
 @router.post("/open_cashdrawer")
-async def open_cashdrawer(printer_name: str):
+async def open_cashdrawer():
     """Open cash drawer without printing."""
-    async def _job():
+    try:
         pos = EscPosHelper(PRINTER_KEY)
-        printer = pos.get_printer()
-        await asyncio.to_thread(printer._raw, CMD_CASHDRAWER)
-    asyncio.create_task(_job())
-    return {"success": True}
+        pos.open_cashdrawer()
+    except Exception as e:
+        logger.error("Unable to oppen cash drawer.")
+        logger.debug("Exception: {e}")
+
+        # Error response for exceptions
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to oppen cash drawer."
+        )
 
 
 @router.post("/cut")
