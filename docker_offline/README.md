@@ -49,6 +49,7 @@ When you need to run the entire **Fiesta POS** stack with **no Internet** (e.g. 
    ```bash
    cd /opt/fiesta-pos/docker_offline
    make -f Makefile.wheels prod     # fills wheelhouse/
+   # And/Or
    make -f Makefile.wheels dev      # fills wheelhouse_dev/
    ```
 
@@ -60,16 +61,41 @@ Copy the entire `/opt/fiesta-pos/` directory (including `docker_offline/*.tar` a
 
 ```bash
 cd /opt/fiesta-pos/docker_offline
-make -f Makefile.update
+make -f Makefile.update load
 ```
 
-`Makefile.update` does:
+`make -f Makefile.update load` does:
 
 1. Loads each `*.tar` via `docker load -i ...`
 
 ---
 
-## 3. Manual fallback commands
+## 3. Run with Internet (online workstation)
+
+You can also skip copying `.tar` and wheels manually if you're online:
+
+```bash
+# Python wheels
+cd /opt/fiesta-pos/hw_proxy
+make -f Makefile.wheels prod
+# And/Or
+make -f Makefile.wheels dev
+
+# Docker images
+cd /opt/fiesta-pos/docker_offline
+make -f Makefile.update
+```
+
+`make -f Makefile.update` does:
+
+1. Pull images
+2. Build `python-3.11-fat`
+3. Save all to `.tar`
+4. Load into Docker
+
+---
+
+## 4. Manual fallback commands
 
 ### Docker images
 
