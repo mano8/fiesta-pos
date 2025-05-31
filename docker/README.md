@@ -1,14 +1,18 @@
-# Install, Secure and Configure Docker
+# Install, Secure, and Configure Docker (with mTLS and `userns-remap`)
 
-## Install Docker
+This guide helps you install Docker securely on Ubuntu, enable `userns-remap` for user isolation, and set up **mutual TLS (mTLS)** for secure Docker API access.
 
-Run the following command to uninstall all conflicting packages:
+---
+
+## 1. Uninstall Conflicting Packages
 
 ```bash
 for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do sudo apt-get remove $pkg; done
 ```
 
-### Set up Docker's apt repository
+## 2. Install Docker
+
+### Add Docker's Official APT Repository
 
 ```bash
 # Add Docker's official GPG key:
@@ -26,66 +30,69 @@ echo \
 sudo apt-get update
 ```
 
-### Install the Docker packages
-
-To install the latest version, run:
+### Install Docker Engine
 
 ```bash
 sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 ```
 
-### Verify that the installation is successful by running the hello-world image
+### Verify Docker Installation
 
 ```bash
 sudo docker run hello-world
 ```
 
-## Active docker `userns-remap`
+## 3. Enable `userns-remap` (Rootless Container Isolation)
 
-- Prepare subUID y subGID
+### Check existing UID/GID mappings
 
 ```bash
 grep -E '^(root|dockremap)' /etc/subuid /etc/subgid
-```
-
-- Read actual subUID y subGID Ranges
-
-```bash
 cat /etc/subuid
-> myUser:100000:65536
+# Example: myUser:100000:65536
 ```
 
-- configure `/etc/docker/daemon.json`
+### Configure `/etc/docker/daemon.json`
 
 ```bash
 sudo nano /etc/docker/daemon.json
 ```
 
-  - Set above content
+Paste:
 
-  ```json
-  {
-    "userns-remap": "default",
-    "experimental": false,
-    "storage-driver": "overlay2"
-  }
-  ```
+```json
+{
+  "userns-remap": "default",
+  "experimental": false,
+  "storage-driver": "overlay2"
+}
+```
 
-  * global log driver: `"log-driver": "journald"`
-  * userns-remap: `default`, docker will create user and ranges
+> 💡 Docker will auto-create the `dockremap` user and map UID/GID ranges.
 
-- Restart docker deamon
+> 💡 you can add global log driver: `"log-driver": "journald"`
+
+### Restart Docker
 
 ```bash
 sudo systemctl daemon-reload
 sudo systemctl restart docker
-getent passwd dockremap
-> dockremap:x:997:985::/home/dockremap:/bin/sh
-id dockremap
-> uid=997(dockremap) gid=985(dockremap) grupos=985(dockremap)
 ```
 
-## Set up mTls for docker demon sock
+### Validate
+
+```bash
+getent passwd dockremap
+# Example: dockremap:x:997:985::/home/dockremap:/bin/sh
+id dockremap
+# Example: uid=997(dockremap) gid=985(dockremap) grupos=985(dockremap)
+```
+
+---
+
+## 4. Set Up Secure Docker API with mTLS
+
+### Define Host IP
 
 ```bash
 export DOCKER_HOST_IP=10.254.254.1
@@ -93,51 +100,49 @@ export DOCKER_HOST_IP=10.254.254.1
 
 ### Generate Certificates
 
-- Generate all needed certificates for docker deamon API
-
 ```bash
 sudo DOCKER_HOST_IP="$DOCKER_HOST_IP" /opt/fiesta-pos/docker/scripts/manage_docker_certs.sh generate
 ```
 
-- To remove all those certificates
+> 🔁 To remove certificates later:
 
 ```bash
 sudo /opt/fiesta-pos/docker/scripts/manage_docker_certs.sh remove
 ```
 
-### Setup dummy interface for docker deamon api
+---
 
-#### With Network manager
+## 5. Configure Dummy Interface for API Binding
 
-- Ensure `NetworkManager` is active
+### Ensure NetworkManager Is Running
 
 ```bash
 systemctl is-enabled NetworkManager
-> enabled
+# Example:  enabled
 systemctl is-active  NetworkManager
-> active
+# Example:  active
 ```
 
-- Set Dummy interface with `nmcli`
+### Add Dummy Interface
 
 ```bash
 sudo nmcli connection add  type dummy ifname docker0-mgmt con-name docker0-mgmt ip4 "$DOCKER_HOST_IP"/32 autoconnect yes
-```
-
-- Active interface
-
-```bash
+# Active interface
 sudo nmcli connection up docker0-mgmt
 ```
 
-- Control
+### Validate
 
 ```bash
 ip addr show docker0-mgmt
 nmcli device status | grep docker0-mgmt
 ```
 
-### Configure Docker deamon  (`/etc/docker/daemon.json`)
+---
+
+## 6. Configure Docker Daemon for mTLS
+
+Edit `/etc/docker/daemon.json`:
 
 ```json
 {
@@ -153,14 +158,14 @@ nmcli device status | grep docker0-mgmt
 }
 ```
 
-- Override docker systemd
+### Override Docker systemd Service
 
 ```bash
 sudo mkdir /etc/systemd/system/docker.service.d
 sudo nano /etc/systemd/system/docker.service.d/override.conf
 ```
 
-- Set content
+Paste:
 
 ```ini
 [Service]
@@ -168,48 +173,48 @@ ExecStart=
 ExecStart=/usr/bin/dockerd --containerd=/run/containerd/containerd.sock
 ```
 
-- Reload docker
+### Reload and Restart
 
 ```bash
 sudo systemctl daemon-reload
 sudo systemctl restart docker
-sudo docker info | grep -E 'Storage Driver|Userns|Experimental'
 ```
 
-- Check
+### Check Docker Status
 
 ```bash
+sudo docker info | grep -E 'Storage Driver|Userns|Experimental'
 sudo systemctl status docker
 
 sudo ss -tlnp | grep dockerd
-> LISTEN 0      4096       10.254.254.1:2376       0.0.0.0:*    users:(("dockerd",pid=16757,fd=4))
-
-# check tls
-# from directory /opt/fiesta-pos/docker/certs
-sudo docker --tlsverify --tlscacert=/opt/fiesta-pos/docker/certs/ca.pem --tlscert=/opt/fiesta-pos/docker/certs/client-cert.pem --tlskey=/opt/fiesta-pos/docker/certs/client-key.pem -H tcp://10.254.254.1:2376 version
+# Example:  LISTEN 0      4096       10.254.254.1:2376       0.0.0.0:*    users:(("dockerd",pid=16757,fd=4))
 ```
 
-### Debug
+## 7. Verify Remote TLS Connection
 
-- Systemd status
+```bash
+cd /opt/fiesta-pos/docker/certs
+
+sudo docker --tlsverify \
+  --tlscacert=ca.pem \
+  --tlscert=client-cert.pem \
+  --tlskey=client-key.pem \
+  -H tcp://10.254.254.1:2376 version
+```
+
+---
+
+## 8. Debugging
+
+### Restart & Logs
 
 ```bash
 sudo systemctl restart docker
-```
-
-- Get basic journalctl logs
-
-```bash
 sudo journalctl -xeu docker.service
-```
-
-- Get last 5 min of journalctl logs
-
-```bash
 sudo journalctl -u docker.service --since "5 minutes ago"
 ```
 
-- Debug docker
+### Run Docker Daemon in Debug Mode
 
 ```bash
 sudo dockerd --debug
