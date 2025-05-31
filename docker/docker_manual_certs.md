@@ -51,8 +51,8 @@ sudo chown -R root:docker /etc/docker/certs
 ```bash
 # Retrieve dockremap UID 
 cat /etc/subuid
-> myUser:100000:65536
-> dockremap:231072:65536
+# Example: myUser:100000:65536
+# Example: dockremap:231072:65536
 # Copy ca.pem
 sudo cp /etc/docker/certs/ca.pem /opt/fiesta-pos/docker/certs/ca.pem
 sudo chmod -R 755 /opt/fiesta-pos/docker/certs
