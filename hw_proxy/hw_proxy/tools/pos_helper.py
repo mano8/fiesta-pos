@@ -1,15 +1,26 @@
 """
 escpos helper for hw_proxy module
 """
+import logging
 import base64
-from typing import Optional
+from typing import Literal, Optional, Union
 from escpos.printer import Usb, Network, Serial, Dummy
 from io import BytesIO
 from PIL import Image
+from hw_proxy.__init__ import configure_logging
 from hw_proxy.tools.device_helper import DeviceHelper
 from hw_proxy.core.exceptions import HwDeviceError, HwPrinterError
 from hw_proxy.core.schemas import DeviceConfigSchemas, NetworkDeviceSchemas, PrinteImageConfSchemas, SerialDeviceSchemas, UsbDeviceSchemas
 from hw_proxy.core.supported_devices import DevicePortType, DeviceType, device_list
+
+logging.basicConfig()
+configure_logging(debug=True)
+logger = logging.getLogger("hw_proxy")
+
+
+CMD_CUT = b"\x1D\x56\x01"        # Corte completo
+CMD_CASHDRAWER = b"\x1B\x70\x00\x19\xFA"  # Apertura de cajón
+
 
 class EscPosHelper(DeviceHelper):
     """
@@ -18,8 +29,9 @@ class EscPosHelper(DeviceHelper):
     def __init__(self, device_key: str):
         DeviceHelper.__init__(self, device_key)
         self.device = self.select_device(device_key)
+        self.printer = None
 
-    def get_printer(self, printer_key: Optional[str] = None):
+    def init_printer(self, printer_key: Optional[str] = None):
         """Get escpos printer object from printer configuration."""
         self.select_device(printer_key)
 
@@ -39,19 +51,19 @@ class EscPosHelper(DeviceHelper):
         try:
             ptype = self.device.port_type
             if ptype == DevicePortType.USB:
-                return Usb(
+                self.printer = Usb(
                     self.device.vendor,
                     self.device.product,
                     in_ep=self.device.conf.in_ep,
                     out_ep=self.device.conf.out_ep
                 )
             elif ptype == DevicePortType.NETWORK:
-                return Network(
+                self.printer = Network(
                     host=self.device.conf.host,
                     port=self.device.conf.port
                 )
             elif ptype == DevicePortType.SERIAL:
-                return Serial(
+                self.printer = Serial(
                     devfile=self.device.conf.devfile,
                     baudrate=self.device.conf.baudrate,
                     bytesize=self.device.conf.bytesize,
@@ -69,6 +81,228 @@ class EscPosHelper(DeviceHelper):
             raise HwPrinterError(
                 f"Fatal Error: Printer connection error: {e}"
             ) from e
+        return self.printer
+
+    def has_printer(self):
+        """Test if escpos printer is initialized."""
+        return isinstance(self.printer, (Usb, Network, Serial, Dummy))
+    
+    def is_printer_ready(self, initialized: bool = False):
+        """Test if escpos printer is initialized."""
+        return self.has_printer()\
+            and self.get_bool_printer_status(initialized=initialized)
+
+    def close_printer(self):
+        """Close escpos printer."""
+        result = False
+        if isinstance(self.printer, Dummy):
+            logger.debug(
+                "[close_printer] Printer is a Dummy instance, "
+                "no close action needed."
+            )
+            result = True
+        elif self.has_printer():
+            try:
+                self.printer.close()
+                self.printer = None
+                result = True
+            except Exception as e:
+                logger.error(f"[close_printer] Error closing printer: {e}")
+                raise HwPrinterError(
+                    f"Fatal Error: Unable to close printer, error: {e}"
+                ) from e
+        return result       
+
+    def get_printer_status(self, initialized: bool = False):
+        """Get escpos printer status."""
+        result = None
+        try:
+            if initialized is not True:
+                self.init_printer()
+            if self.has_printer():
+                is_online = self.printer.is_online()
+                paper_status_code = self.printer.paper_status()
+                paper_status_map = {
+                    2: "ok",
+                    1: "near_end",
+                    0: "no_paper"
+                }
+                paper_status = paper_status_map.get(paper_status_code, "unknown")
+                result = {
+                    "is_online": is_online,
+                    "paper_status": paper_status
+                }
+            else:
+                result = {
+                    "is_online": False,
+                    "paper_status": "unknown"
+                }
+        except Exception as e:
+            logger.error(
+                "[print_receipt] Fatal Error: Unable to get printer status, "
+                f"error: {e} "
+            )
+            result = {
+                "is_online": False,
+                "paper_status": "unknown",
+                "error": str(e)
+            }
+        finally:
+            logger.debug(
+                f"Printer status: {is_online}, "
+                f"Paper status: {paper_status} "
+            )
+            if initialized is not True:
+                self.close_printer()
+        return result
+
+    def get_bool_printer_status(
+        self,
+        printer_status: Optional[Union[dict, bool]] = False,
+        initialized: bool = False
+    ) -> bool:
+        """Get Bolean representation of escpos printer status."""
+        if printer_status is False:
+            status = self.get_printer_status(initialized=initialized)
+        return isinstance(status, dict)\
+            and status.get("is_online", False) is True\
+            and status.get("paper_status", "unknown") == "ok"
+    
+    def get_str_printer_status(
+        self,
+        printer_status: Optional[Union[dict, bool]] = False
+    ) -> Literal["connected", "disconnected"]:
+        """Get String representation of escpos printer status."""
+        result = "disconnected"
+        status = self.get_bool_printer_status(
+            printer_status=printer_status
+        )
+        if status is True:
+            result = "connected"
+        return result
+
+    def print_receipt(self, receipt: str):
+        """Print receipt using escpos printer."""
+        result = False
+        try:
+            self.init_printer()
+            if self.is_printer_ready(initialized=True):
+                logger.debug("[print_receipt] Convert receipt to Image...")
+                img = self.format_base64_to_image(receipt)
+                d = Dummy()
+                d.image(img, impl="bitImageColumn")
+                d.cut(feed=True)
+                self.printer._raw(d.output)
+                result = True
+                logger.debug("[print_receipt] Ticket Impress with success...")
+            else:
+                logger.error(
+                    "[print_receipt] Printer not initialized or not available."
+                )
+        except Exception as e:
+            logger.error(
+                "[print_receipt] Fatal Error: Unable to print receipt, "
+                f"error: {e} "
+            )
+            self.close_printer()
+            raise HwPrinterError(
+                "[print_receipt] Fatal Error: Unable to print receipt, "
+                f"error: {e} "
+            ) from e
+        finally:
+            self.close_printer()
+        return result
+
+    def cut_receipt(self):
+        """Cut receipt using escpos printer."""
+        result = False
+        try:
+            self.init_printer()
+            if self.is_printer_ready(initialized=True):
+                logger.debug("[cut_receipt] Cut Receipt...")
+                self.printer.cut(feed=True)
+                result = True
+            else:
+                logger.error(
+                    "[cut_receipt] Printer not initialized or not available."
+                )
+        except Exception as e:
+            logger.error(
+                "[cut_receipt] Fatal Error: Unable to cut receipt, "
+                f"error: {e} "
+            )
+            self.close_printer()
+            raise HwPrinterError(
+                "[cut_receipt] Fatal Error: Unable to cut receipt, "
+                f"error: {e} "
+            ) from e
+        finally:
+            self.close_printer()
+        return result
+
+    def open_cashdrawer(self):
+        """Open cash drawer using escpos printer."""
+        result = False
+        try:
+            self.init_printer()
+            if self.has_printer():
+                logger.debug("[open_cashdrawer] Open Cash Drawer...")
+                # Assuming CMD_CASHDRAWER is defined in escpos library
+                self.printer._raw(CMD_CASHDRAWER)
+                result = True
+            else:
+                logger.error(
+                    "[open_cashdrawer] Printer not initialized or not available."
+                )
+        except Exception as e:
+            logger.error(
+                "[open_cashdrawer] Fatal Error: Unable to open cash drawer, "
+                f"error: {e} "
+            )
+            self.close_printer()
+            raise HwPrinterError(
+                "[open_cashdrawer] Fatal Error: Unable to open cash drawer, "
+                f"error: {e} "
+            ) from e
+        finally:
+            self.close_printer()
+        return result
+
+    def default_printer_action(
+        self,
+        action: str,
+        receipt: Optional[str] = None
+    ):
+        """Run default printer action."""
+        result = False
+        try:
+            if action == "print_receipt":
+                result = self.print_receipt(
+                    receipt=receipt
+                )
+            elif action == "cut_receipt":
+                result = self.cut_receipt()
+            elif action in ("cashbox", "cashdrawer"):
+                result = self.open_cashdrawer()
+            else:
+                logger.warning(
+                    "[default_printer_action] Unknown "
+                    f"default_printer_action: {action}"
+                )
+                result = False
+        except Exception as e:
+            logger.error(
+                "[default_printer_action] Fatal Error: "
+                f"Unable to run printer action: {action}, "
+                f"error: {e}"
+            )
+            raise HwPrinterError(
+                "[default_printer_action] Fatal Error: "
+                f"Unable to run printer action: {action}, "
+                f"error: {e} "
+            ) from e
+        return result
+
 
     @staticmethod
     def set_device_port_schema(
