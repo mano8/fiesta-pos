@@ -15,3 +15,6 @@
 
 # certs
 *.pem
+
+# Offline files
+docker_offline/*.tar
