@@ -17,6 +17,8 @@ services:
       - ./traefik/acme.json:/etc/traefik/acme.json
     logging:
       driver: "journald"
+    security_opt:
+      - no-new-privileges:true
     restart: unless-stopped
     networks:
       - odoo_network
@@ -50,6 +52,7 @@ services:
       SET_DOCS: true
       SET_REDOC: true
       PRINTER_KEY: "PP6800"
+    userns_mode: "host"
     devices:
       - /dev/ttyACM0:/dev/ttyACM0
     group_add:
@@ -59,7 +62,6 @@ services:
       - ./hw_proxy.env:/opt/hw_proxy/.env:ro
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.hw-proxy.entrypoints=hw"
       - "traefik.http.services.hw-proxy.loadbalancer.server.port=8015"
     logging:
       driver: "journald"
@@ -70,15 +72,26 @@ services:
   fiesta_odoo:
     image: odoo:18.0
     volumes:
-      - ./odoo/data:/var/lib/odoo
-      - ./odoo/config:/etc/odoo
-      - ./odoo/addons:/mnt/extra-addons
+      - ./odoo/data:/var/lib/odoo:rw
+      - ./odoo/config:/etc/odoo:rw
+      - ./odoo/addons:/mnt/extra-addons:rw
     links:
       - "fiesta_db:db"
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.odoo.entrypoints=api,websecure"
       - "traefik.http.services.odoo.loadbalancer.server.port=8069"
+    command: >
+      bash -c '
+        export PGPASSWORD="$DB_PASSWORD"
+        if psql -h "$DB_HOST" -U "$DB_USER" -d "$DB_DATABASE" -tAc "SELECT 1 FROM res_users LIMIT 1;" 2>/dev/null | grep -q 1; then
+          echo "Database odoo exists, starting normally...";
+          exec odoo --dev=reload --database "$DB_DATABASE" --db_host=fiesta_db --db_user "$DB_USER" --db_password "$DB_PASSWORD";
+        else
+          echo "Database odoo missing — initializing with -i base...";
+          exec odoo -i base --without-demo=True --database "$DB_DATABASE" --db_host=fiesta_db --db_user "$DB_USER" --db_password "$DB_PASSWORD" --stop-after-init &&
+          exec odoo --dev=reload --database "$DB_DATABASE" --db_host=fiesta_db --db_user "$DB_USER" --db_password "$DB_PASSWORD";
+        fi
+      '
     logging:
       driver: "journald"
     depends_on:
