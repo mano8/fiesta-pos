@@ -7,14 +7,12 @@ from typing import Literal, Optional, Union
 from escpos.printer import Usb, Network, Serial, Dummy
 from io import BytesIO
 from PIL import Image
-from hw_proxy.__init__ import configure_logging
 from hw_proxy.tools.device_helper import DeviceHelper
 from hw_proxy.core.exceptions import HwDeviceError, HwPrinterError
 from hw_proxy.core.schemas import DeviceConfigSchemas, NetworkDeviceSchemas, PrinteImageConfSchemas, SerialDeviceSchemas, UsbDeviceSchemas
 from hw_proxy.core.supported_devices import DevicePortType, DeviceType, device_list
 
-logging.basicConfig()
-configure_logging(debug=True)
+
 logger = logging.getLogger("hw_proxy")
 
 
@@ -90,7 +88,7 @@ class EscPosHelper(DeviceHelper):
     def is_printer_ready(self, initialized: bool = False):
         """Test if escpos printer is initialized."""
         return self.has_printer()\
-            and self.get_bool_printer_status(initialized=initialized)
+            and self.get_bool_full_printer_status(initialized=initialized)
 
     def close_printer(self):
         """Close escpos printer."""
@@ -121,6 +119,73 @@ class EscPosHelper(DeviceHelper):
                 self.init_printer()
             if self.has_printer():
                 is_online = self.printer.is_online()
+            else:
+                result = {
+                    "is_online": False
+                }
+        except Exception as e:
+            logger.error(
+                "[get_printer_status] Fatal Error: Unable to get printer status, "
+                f"error: {e} "
+            )
+            result = {
+                "is_online": False,
+                "error": str(e)
+            }
+        finally:
+            logger.debug(
+                f"[get_printer_status] Printer status: {is_online}, "
+            )
+            if initialized is not True:
+                self.close_printer()
+        return result
+    
+    def get_paper_printer_status(self, initialized: bool = False):
+        """Get escpos printer status."""
+        result = None
+        try:
+            if initialized is not True:
+                self.init_printer()
+            if self.has_printer():
+                paper_status_code = self.printer.paper_status()
+                paper_status_map = {
+                    2: "ok",
+                    1: "near_end",
+                    0: "no_paper"
+                }
+                paper_status = paper_status_map.get(paper_status_code, "unknown")
+                result = {
+                    "paper_status": paper_status
+                }
+            else:
+                result = {
+                    "paper_status": "unknown"
+                }
+        except Exception as e:
+            logger.error(
+                "[get_paper_printer_status] Fatal Error: Unable to get printer status, "
+                f"error: {e} "
+            )
+            result = {
+                "paper_status": "unknown",
+                "error": str(e)
+            }
+        finally:
+            logger.debug(
+                f"[get_paper_printer_status] Printer paper status: {paper_status}, "
+            )
+            if initialized is not True:
+                self.close_printer()
+        return result
+
+    def get_full_printer_status(self, initialized: bool = False):
+        """Get escpos printer status."""
+        result = None
+        try:
+            if initialized is not True:
+                self.init_printer()
+            if self.has_printer():
+                is_online = self.printer.is_online()
                 paper_status_code = self.printer.paper_status()
                 paper_status_map = {
                     2: "ok",
@@ -139,7 +204,7 @@ class EscPosHelper(DeviceHelper):
                 }
         except Exception as e:
             logger.error(
-                "[print_receipt] Fatal Error: Unable to get printer status, "
+                "[get_full_printer_status] Fatal Error: Unable to get printer status, "
                 f"error: {e} "
             )
             result = {
@@ -149,7 +214,7 @@ class EscPosHelper(DeviceHelper):
             }
         finally:
             logger.debug(
-                f"Printer status: {is_online}, "
+                f"[get_full_printer_status] Printer status: {is_online}, "
                 f"Paper status: {paper_status} "
             )
             if initialized is not True:
@@ -163,18 +228,40 @@ class EscPosHelper(DeviceHelper):
     ) -> bool:
         """Get Bolean representation of escpos printer status."""
         if printer_status is False:
-            status = self.get_printer_status(initialized=initialized)
-        return isinstance(status, dict)\
-            and status.get("is_online", False) is True\
-            and status.get("paper_status", "unknown") == "ok"
+            printer_status = self.get_printer_status(initialized=initialized)
+        return isinstance(printer_status, dict)\
+            and printer_status.get("is_online", False) is True
     
-    def get_str_printer_status(
+    def get_bool_paper_printer_status(
+        self,
+        printer_status: Optional[Union[dict, bool]] = False,
+        initialized: bool = False
+    ) -> bool:
+        """Get Bolean representation of escpos printer status."""
+        if printer_status is False:
+            printer_status = self.get_paper_printer_status(initialized=initialized)
+        return isinstance(printer_status, dict)\
+            and printer_status.get("paper_status", "unknown") == "ok"
+    
+    def get_bool_full_printer_status(
+        self,
+        printer_status: Optional[Union[dict, bool]] = False,
+        initialized: bool = False
+    ) -> bool:
+        """Get Bolean representation of escpos printer status."""
+        if printer_status is False:
+            printer_status = self.get_full_printer_status(initialized=initialized)
+        return isinstance(printer_status, dict)\
+            and printer_status.get("is_online", False) is True\
+            and printer_status.get("paper_status", "unknown") == "ok"
+
+    def get_str_full_printer_status(
         self,
         printer_status: Optional[Union[dict, bool]] = False
     ) -> Literal["connected", "disconnected"]:
         """Get String representation of escpos printer status."""
         result = "disconnected"
-        status = self.get_bool_printer_status(
+        status = self.get_bool_full_printer_status(
             printer_status=printer_status
         )
         if status is True:
