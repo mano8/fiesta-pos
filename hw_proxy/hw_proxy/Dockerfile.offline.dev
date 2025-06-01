@@ -34,8 +34,8 @@ USER appuser
 # Use --no-cache-dir to avoid caching the packages in the image
 # Use --user to install packages in the user's home directory
 RUN pip install --no-index --no-cache-dir --user \
-      --find-links=/wheelhouse \
-      -r requirements-docker.txt
+      --find-links=wheelhouse \
+      -r requirements-docker-dev.txt
 
 
 RUN dos2unix /opt/hw_proxy/scripts/docker_start.sh
