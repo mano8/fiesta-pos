@@ -8,6 +8,10 @@ ENV PYTHONUNBUFFERED=1 \
     # Add the local user's bin directory to PATH
     PATH="/home/appuser/.local/bin:$PATH"
 
+    # Create a non-root user and group
+RUN groupadd --gid 1000 appuser && \
+    useradd --uid 1000 --gid appuser --create-home appuser
+    
 # Add the user to the dialout group
 RUN usermod -aG dialout appuser
 
