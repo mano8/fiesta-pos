@@ -11,7 +11,7 @@ ENV PYTHONUNBUFFERED=1 \
     # Create a non-root user and group
 RUN groupadd --gid 1000 appuser && \
     useradd --uid 1000 --gid appuser --create-home appuser
-    
+
 # Add the user to the dialout group
 RUN usermod -aG dialout appuser
 
@@ -34,7 +34,7 @@ USER appuser
 # Use --no-cache-dir to avoid caching the packages in the image
 # Use --user to install packages in the user's home directory
 RUN pip install --no-index --no-cache-dir --user \
-      --find-links=/wheelhouse \
+      --find-links=./wheelhouse \
       -r requirements-docker.txt
 
 
