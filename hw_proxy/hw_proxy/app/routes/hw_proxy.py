@@ -7,18 +7,16 @@ import base64
 from fastapi import APIRouter, HTTPException, Header, Request
 from fastapi.responses import JSONResponse
 from escpos.printer import Dummy
-from hw_proxy.__init__ import configure_logging
 from hw_proxy.tools.pos_helper import EscPosHelper
 from hw_proxy.core.schemas import PrintRequest
+from hw_proxy.core.deps import get_templates
+from hw_proxy.core.config import settings
 
-logging.basicConfig()
-configure_logging(debug=True)
 logger = logging.getLogger("hw_proxy")
 
 router = APIRouter()
 
 IOT_BOX_SECRET = None
-PRINTER_KEY = "PP6800"
 # --- Constantes ESC/POS legibles ---
 CMD_CUT = b"\x1D\x56\x01"        # Corte completo
 CMD_CASHDRAWER = b"\x1B\x70\x00\x19\xFA"  # Apertura de cajón
@@ -84,14 +82,20 @@ async def status_json(req: Request):
     Exact expected output is not clear.
     """
     try:
-        logger.debug("[status_json] Get printer status")
-        pos = EscPosHelper(PRINTER_KEY)
-        status = pos.get_printer_status() #await asyncio.to_thread(pos.get_printer_status())
-        current_status = pos.get_str_printer_status(
+        logger.debug(
+            f"[status_json] Get printer status for device: {settings.PRINTER_KEY}"
+        )
+        pos = EscPosHelper(settings.PRINTER_KEY)
+        #await asyncio.to_thread(pos.get_printer_status())
+        status = pos.get_full_printer_status()
+        logger.debug(
+            f"[status_json] status: {status}"
+        )
+        current_status = pos.get_str_full_printer_status(
             printer_status=status
         )
         logger.debug(
-            f"[status_json] status: {current_status}"
+            f"[status_json] current_status: {current_status}"
         )
         return JSONResponse({
             "jsonrpc": "2.0",
@@ -146,7 +150,7 @@ async def default_printer_action(req: Request):
         data = params.get("data", {})
         action = data.get("action")
         receipt = data.get("receipt")
-        pos = EscPosHelper(PRINTER_KEY)
+        pos = EscPosHelper(settings.PRINTER_KEY)
         # asyncio.create_task(asyncio.to_thread(_job))
         result = pos.default_printer_action(
             action=action,
@@ -198,7 +202,7 @@ async def default_printer_action(req: Request):
 async def open_cashdrawer():
     """Open cash drawer without printing."""
     try:
-        pos = EscPosHelper(PRINTER_KEY)
+        pos = EscPosHelper(settings.PRINTER_KEY)
         pos.open_cashdrawer()
     except Exception as e:
         logger.error("Unable to oppen cash drawer.")
@@ -215,7 +219,7 @@ async def open_cashdrawer():
 async def cut_paper(printer_name: str):
     """Cut paper without printing."""
     async def _job():
-        pos = EscPosHelper(PRINTER_KEY)
+        pos = EscPosHelper(settings.PRINTER_KEY)
         printer = pos.get_printer()
         await asyncio.to_thread(printer._raw, CMD_CUT)
     asyncio.create_task(_job())
