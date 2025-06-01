@@ -1,5 +1,6 @@
 """hw_proxy Package"""
 import logging
+from typing import Optional
 
 from hw_proxy.__version__ import VERSION
 
@@ -46,30 +47,40 @@ class CustomFormatter(logging.Formatter):
         return formatter.format(record)
 
 
-def configure_logging(debug=None):
+def configure_logging(log_level: Optional[str] = "INFO"):
     """
-    Prepare log folder in current home directory.
+    Configure the Python logger for the 'hw_proxy' module.
 
-    :param debug: If true, set the lof level to debug
+    Sets up a StreamHandler with a custom formatter, and validates the log level.
 
+    Args:
+        log_level (Optional[str]): Logging level to use (e.g., 'DEBUG', 'INFO').
+                                   Defaults to 'INFO'. Must be a valid logging level name.
+
+    Raises:
+        ValueError: If log_level is not a recognized logging level.
     """
     log = logging.getLogger("hw_proxy")
     log.addFilter(AppFilter())
     log.propagate = False
-    syslog = logging.StreamHandler()
-    syslog.setLevel(logging.DEBUG)
+
+    handler = logging.StreamHandler()
+    handler.setLevel(logging.DEBUG)
 
     formatter = CustomFormatter(
-        '%(asctime)s :: %(app_version)s :: %(message)s', "%Y-%m-%d %H:%M:%S"
+        '%(asctime)s :: %(app_version)s :: %(message)s',
+        "%Y-%m-%d %H:%M:%S"
     )
-    syslog.setFormatter(formatter)
+    handler.setFormatter(formatter)
 
-    if debug:
-        log.setLevel(logging.DEBUG)
-    else:
-        log.setLevel(logging.INFO)
+    # Normalize and validate log level
+    log_level = log_level.upper() if log_level else "INFO"
+    if log_level not in logging._nameToLevel:
+        raise ValueError(f"Invalid log level: '{log_level}'. Must be one of: {', '.join(logging._nameToLevel.keys())}")
 
-    # add the handlers to logger
-    log.addHandler(syslog)
+    log.setLevel(logging._nameToLevel[log_level])
+    log.addHandler(handler)
 
-    log.debug("Logger ready")
+    log.debug(
+        f"Logger log_level set as {log_level} and configured with level: {log_level}"
+    )
