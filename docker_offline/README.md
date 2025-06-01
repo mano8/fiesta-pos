@@ -76,7 +76,7 @@ You can also skip copying `.tar` and wheels manually if you're online:
 
 ```bash
 # Python wheels
-cd /opt/fiesta-pos/hw_proxy
+cd /opt/fiesta-pos/docker_offline
 make -f Makefile.wheels prod
 # And/Or
 make -f Makefile.wheels dev
