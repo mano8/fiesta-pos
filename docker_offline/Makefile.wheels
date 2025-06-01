@@ -10,12 +10,12 @@ WHEELHOUSE_DEV = ../hw_proxy/wheelhouse_dev
 prod:
 	@mkdir -p $(WHEELHOUSE)
 	@rm -rf $(WHEELHOUSE)/*
-	$(PYTHON) -m $(PIP) download --dest $(WHEELHOUSE) -r $(REQ_PROD)
+	$(PYTHON) -m $(PIP) download --only-binary=:all: --python-version 3.11 --dest $(WHEELHOUSE) -r $(REQ_PROD)
 
 dev:
 	@mkdir -p $(WHEELHOUSE_DEV)
 	@rm -rf $(WHEELHOUSE_DEV)/*
-	$(PYTHON) -m $(PIP) download --dest $(WHEELHOUSE_DEV) -r $(REQ_DEV)
+	$(PYTHON) -m $(PIP) download --only-binary=:all: --python-version 3.11 --dest $(WHEELHOUSE_DEV) -r $(REQ_DEV)
 
 clean:
 	@rm -rf $(WHEELHOUSE) $(WHEELHOUSE_DEV)
