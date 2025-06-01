@@ -1,9 +1,9 @@
 PYTHON ?= python3
 PIP ?= pip
 REQ_PROD = ../hw_proxy/hw_proxy/requirements-docker.txt
-REQ_DEV = ../hw_proxyhw_proxy/requirements-docker-dev.txt
-WHEELHOUSE = wheelhouse
-WHEELHOUSE_DEV = wheelhouse_dev
+REQ_DEV = ../hw_proxy/hw_proxy/requirements-docker-dev.txt
+WHEELHOUSE = ../hw_proxy/wheelhouse
+WHEELHOUSE_DEV = ../hw_proxy/wheelhouse_dev
 
 .PHONY: prod dev clean
 
