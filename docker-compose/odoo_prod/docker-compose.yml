@@ -17,6 +17,8 @@ services:
       - ./traefik/acme.json:/etc/traefik/acme.json
     logging:
       driver: "journald"
+    security_opt:
+      - no-new-privileges:true
     restart: unless-stopped
     networks:
       - odoo_network
