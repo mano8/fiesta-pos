@@ -3,8 +3,8 @@
 # Allow overriding if you don’t need sudo
 SUDO ?= sudo
 
-HW_PROXY_DIR   := ../hw_proxy/hw_proxy
-FAT_DOCKERFILE := $(HW_PROXY_DIR)/Dockerfile.fat
+hw_status_DIR   := ../hw_status/hw_status
+FAT_DOCKERFILE := $(hw_status_DIR)/Dockerfile.fat
 
 TAGS := \
 	traefik:v3.4.0 \
@@ -26,7 +26,7 @@ build: pull
 	$(SUDO) docker build \
 	  -f $(FAT_DOCKERFILE) \
 	  -t my-python-3.11-fat:latest \
-	  $(HW_PROXY_DIR)
+	  $(hw_status_DIR)
 
 save: build
 	@echo "Saving images to tarballs…"

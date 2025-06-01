@@ -3,7 +3,7 @@
 When you need to run the entire **Fiesta POS** stack with **no Internet** (e.g. in an air-gapped environment), you must:
 
 1. **Vendor all Docker images** locally (Traefik, Postgres, Odoo, Python-fat)
-2. **Cache all Python wheels** in `hw_proxy/wheelhouse/` and `hw_proxy/wheelhouse_dev/`
+2. **Cache all Python wheels** in `hw_status/wheelhouse/` and `hw_status/wheelhouse_dev/`
 3. **Configure** Compose and Dockerfiles to install **only** from those local artifacts
 
 ---
@@ -20,13 +20,13 @@ When you need to run the entire **Fiesta POS** stack with **no Internet** (e.g. 
 │   ├── postgres_13.21-alpine3.20.tar
 │   ├── odoo_18.0.tar
 │   └── python-3.11-fat.tar
-└── hw_proxy/
+└── hw_status/
     ├── wheelhouse/             ← prod wheels (in `.gitignore`)
     ├── wheelhouse_dev/         ← dev wheels (in `.gitignore`)
-    └── hw_proxy/
+    └── hw_status/
         ├── requirements-docker.txt
         ├── requirements-docker-dev.txt
-        ├── Dockerfile.fat          ← Vendor Docker hw_proxy base image
+        ├── Dockerfile.fat          ← Vendor Docker hw_status base image
         ├── Dockerfile.offline.dev  ← builds using local wheelhouses (dev)
         └── Dockerfile.offline      ← builds using local wheelhouses (prod)
 ```
@@ -106,7 +106,7 @@ docker pull traefik:v3.4.0
 docker pull postgres:13.21-alpine3.20
 docker pull odoo:18.0
 
-docker build -f ../hw_proxy/FatDockerfile -t python-3.11-fat:latest ../hw_proxy
+docker build -f ../hw_status/FatDockerfile -t python-3.11-fat:latest ../hw_status
 
 docker save traefik:v3.4.0   -o traefik_v3.4.0.tar
 docker save postgres:13.21-alpine3.20 \
@@ -120,10 +120,10 @@ docker load -i traefik_v3.4.0.tar
 ... (repeat for others)
 ```
 
-### Python wheels for `hw_proxy`
+### Python wheels for `hw_status`
 
 ```bash
-cd /opt/fiesta-pos/hw_proxy
+cd /opt/fiesta-pos/hw_status
 
 # Production wheels:
 pip download --dest wheelhouse     -r requirements-docker.txt
