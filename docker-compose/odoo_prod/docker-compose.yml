@@ -57,7 +57,7 @@ services:
       - dialout
     volumes:
       - ../../hw_proxy/hw_proxy:/opt/hw_proxy
-      - ./hw_proxy.env:/opt/hw_proxy_service/.env:ro
+      - ./hw_proxy.env:/opt/hw_proxy/.env:ro
     labels:
       - "traefik.enable=true"
       - "traefik.http.services.hw-proxy.loadbalancer.server.port=8015"
