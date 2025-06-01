@@ -41,7 +41,7 @@ services:
   hw_proxy_service:
     build:
       context: ../../hw_proxy
-      dockerfile: ./hw_proxy/Dockerfile
+      dockerfile: ./hw_proxy/Dockerfile.offline.dev
     env_file:
       - ./hw_proxy.env
     environment:
