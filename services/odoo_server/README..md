@@ -1,5 +1,29 @@
 # Odoo Server services
 
+## 0. hw_proxy service
+
+- Add service to `systemd`
+
+```bash
+sudo cp services/odoo_server/hw_proxy.service /etc/systemd/system/hw_proxy.service
+```
+
+- Enable it
+
+```bash
+sudo systemctl daemon-reexec
+sudo systemctl enable hw_proxy.service
+sudo systemctl daemon-reload
+sudo systemctl start hw_proxy.service
+```
+
+- Check status
+
+```bash
+sudo systemctl status serial-config.service
+sudo journalctl -xeu serial-config.service
+```
+
 ## 1. Auto configure ttyACM0 port for PP6800 printer
 
 By default ttyACM0 is configure with baud od 9600.

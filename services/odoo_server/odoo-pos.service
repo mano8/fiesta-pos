@@ -7,7 +7,7 @@ Wants=network-online.target
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-WorkingDirectory=/opt/fiesta-pos/docker-compose/odoo_dev
+WorkingDirectory=/opt/fiesta-pos/docker-compose/odoo_prod
 ExecStart=/bin/sh -c "/usr/libexec/docker/cli-plugins/docker-compose up -d --remove-orphans"
 # ExecStop=/bin/sh -c "/usr/libexec/docker/cli-plugins/docker-compose stop"
 # Restart=on-failure
