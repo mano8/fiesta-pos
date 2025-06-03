@@ -20,7 +20,7 @@ http:
     hw-proxy-router:
       entryPoints:
         - hw
-      rule: "PathPrefix(`/hw_proxy`)"
+      rule: "PathPrefix(`/hw_status`)"
       service: hw-proxy-service
     #  tls: {}
 
@@ -32,7 +32,7 @@ http:
     hw-proxy-service:
       loadBalancer:
         servers:
-          - url: "http://hw_proxy_service:8015"
+          - url: "http://hw_status_service:8015"
 
   middlewares:
     ip-allowlist:
