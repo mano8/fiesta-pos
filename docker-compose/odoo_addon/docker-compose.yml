@@ -6,7 +6,7 @@ services:
       - "4430:443"
       - "8080:8080"   # Dashboard
       - "9000:9000"   # odoo entryPoint
-      - "9001:9001"   # hw_proxy entryPoint
+      - "9001:9001"   # hw_status entryPoint
     volumes:
       - ../../docker/certs/ca.pem:/etc/traefik/docker_certs/ca.pem:ro
       - ../../docker/certs/client-cert.pem:/etc/traefik/docker_certs/client-cert.pem:ro
@@ -40,26 +40,22 @@ services:
     networks:
       - odoo_network
 
-  hw_proxy_service:
+  hw_status_service:
     build:
-      context: ../../hw_proxy
-      dockerfile: ./hw_proxy/Dockerfile.offline.dev
+      context: ../../hw_status
+      dockerfile: ./hw_status/Dockerfile.offline.dev
     env_file:
-      - ./hw_proxy.env
+      - ./hw_status.env
     environment:
       ENVIRONMENT: development
       SET_OPEN_API: true
       SET_DOCS: true
       SET_REDOC: true
       PRINTER_KEY: "PP6800"
-    userns_mode: "host"
-    devices:
-      - /dev/ttyACM0:/dev/ttyACM0
-    group_add:
-      - dialout
     volumes:
-      - ../../hw_proxy/hw_proxy:/opt/hw_proxy
-      - ./hw_proxy.env:/opt/hw_proxy/.env:ro
+      - ../../hw_status/hw_status:/opt/hw_status
+      - ./hw_status.env:/opt/hw_status/.env:ro
+    userns_mode: "host"
     labels:
       - "traefik.enable=true"
       - "traefik.http.services.hw-proxy.loadbalancer.server.port=8015"
