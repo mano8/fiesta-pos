@@ -5,14 +5,14 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "hw_proxy",
+            "name": "hw_proxy_fiasta",
             "type": "debugpy",
             "cwd": "${workspaceFolder}/hw_proxy",
             "request": "launch",
             "module": "uvicorn",
             "args": [
                 "hw_proxy.main:app",
-                "--port=8015",
+                "--port=9002",
                 "--host=0.0.0.0",
                 "--reload"
             ],
